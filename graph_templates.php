@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,16 +23,17 @@
 */
 
 include('./include/auth.php');
-include_once('./lib/utility.php');
-include_once('./lib/template.php');
-include_once('./lib/api_tree.php');
 include_once('./lib/api_graph.php');
+include_once('./lib/api_tree.php');
 include_once('./lib/html_tree.php');
+include_once('./lib/poller.php');
+include_once('./lib/template.php');
+include_once('./lib/utility.php');
 
 $graph_actions = array(
 	1 => __('Delete'),
 	2 => __('Duplicate'),
-	3 => __('Resize'),
+	3 => __('Change Settings'),
 	4 => __('Sync Graphs')
 );
 
@@ -47,11 +48,6 @@ switch (get_request_var('action')) {
 	case 'actions':
 		form_actions();
 
-		break;
-	case 'template_remove':
-		template_remove();
-
-		header('Location: graph_templates.php?header=false');
 		break;
 	case 'input_remove':
 		get_filter_request_var('graph_template_id');
@@ -170,6 +166,11 @@ function form_save() {
 		$save2['left_axis_formatter']    = form_input_validate((isset_request_var('left_axis_formatter') ? get_nfilter_request_var('left_axis_formatter') : ''), 'left_axis_formatter', '', true, 3);
 
 		if (!is_error_message()) {
+			// Clear the Graph Template cache
+			if (empty($graph_template_id)) {
+				clear_cached_allowed_types();
+			}
+
 			$graph_template_id = sql_save($save1, 'graph_templates');
 
 			if ($graph_template_id) {
@@ -205,7 +206,7 @@ function form_save() {
    ------------------------ */
 
 function form_actions() {
-	global $graph_actions, $config;
+	global $graph_actions, $config, $image_types;
 
 	/* ================= input validation ================= */
 	get_filter_request_var('drp_action', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([a-zA-Z0-9_]+)$/')));
@@ -220,11 +221,35 @@ function form_actions() {
 				db_execute('DELETE FROM graph_templates
 					WHERE ' . array_to_sql_or($selected_items, 'id'));
 
+				$snmp_graph_ids = array_rekey(
+					db_fetch_assoc('SELECT id
+						FROM snmp_query_graph
+						WHERE ' . array_to_sql_or($selected_items, 'graph_template_id')),
+					'id', 'id'
+				);
+
+				if (cacti_sizeof($snmp_graph_ids)) {
+					db_execute('DELETE FROM snmp_query_graph
+						WHERE ' . array_to_sql_or($selected_items, 'graph_template_id'));
+
+					db_execute('DELETE FROM snmp_query_graph_rrd
+						WHERE snmp_query_graph_id IN (' . implode(', ', $snmp_graph_ids) . ')');
+
+					db_execute('DELETE FROM snmp_query_graph_rrd_sv
+						WHERE snmp_query_graph_id IN (' . implode(', ', $snmp_graph_ids) . ')');
+
+					db_execute('DELETE FROM snmp_query_graph_rrd_sv
+						WHERE snmp_query_graph_id IN (' . implode(', ', $snmp_graph_ids) . ')');
+
+					db_execute('DELETE FROM snmp_query_graph_sv
+						WHERE snmp_query_graph_id IN (' . implode(', ', $snmp_graph_ids) . ')');
+				}
+
 				$graph_template_input = db_fetch_assoc('SELECT id
 					FROM graph_template_input
 					WHERE ' . array_to_sql_or($selected_items, 'graph_template_id'));
 
-				if (sizeof($graph_template_input) > 0) {
+				if (cacti_sizeof($graph_template_input) > 0) {
 					foreach ($graph_template_input as $item) {
 						db_execute_prepared('DELETE FROM graph_template_input_defs
 							WHERE graph_template_input_id = ?', array($item['id']));
@@ -255,24 +280,28 @@ function form_actions() {
 				db_execute('UPDATE graph_local
 					SET graph_template_id=0
 					WHERE ' . array_to_sql_or($selected_items, 'graph_template_id'));
+
+				clear_cached_allowed_types();
 			} elseif (get_request_var('drp_action') == '2') { // duplicate
-				for ($i=0;($i<count($selected_items));$i++) {
+				for ($i=0;($i<cacti_count($selected_items));$i++) {
 					api_duplicate_graph(0, $selected_items[$i], get_nfilter_request_var('title_format'));
 				}
 			} elseif (get_request_var('drp_action') == '3') { // resize
 				get_filter_request_var('graph_width');
 				get_filter_request_var('graph_height');
+				get_filter_request_var('image_format_id');
 
-				for ($i=0;($i<count($selected_items));$i++) {
+				for ($i=0;($i<cacti_count($selected_items));$i++) {
 					db_execute_prepared('UPDATE graph_templates_graph
-						SET width = ?, height = ?
+						SET width = ?, height = ?, image_format_id = ?
 						WHERE graph_template_id = ?',
 						array(get_request_var('graph_width'),
 						get_request_var('graph_height'),
+						get_request_var('image_format_id'),
 						$selected_items[$i]));
 				}
 			} elseif (get_request_var('drp_action') == '4') { // retemplate
-				for ($i=0;($i<count($selected_items));$i++) {
+				for ($i=0;($i<cacti_count($selected_items));$i++) {
 					retemplate_graphs($selected_items[$i]);
 				}
 			}
@@ -292,7 +321,7 @@ function form_actions() {
 			input_validate_input_number($matches[1]);
 			/* ==================================================== */
 
-			$graph_list .= '<li>' . htmlspecialchars(db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array($matches[1]))) . '</li>';
+			$graph_list .= '<li>' . html_escape(db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array($matches[1]))) . '</li>';
 			$graph_array[$i] = $matches[1];
 
 			$i++;
@@ -303,9 +332,9 @@ function form_actions() {
 
 	form_start('graph_templates.php');
 
-	html_start_box($graph_actions{get_nfilter_request_var('drp_action')}, '60%', '', '3', 'center', '');
+	html_start_box($graph_actions[get_nfilter_request_var('drp_action')], '60%', '', '3', 'center', '');
 
-	if (isset($graph_array) && sizeof($graph_array)) {
+	if (isset($graph_array) && cacti_sizeof($graph_array)) {
 		if (get_request_var('drp_action') == '1') { // delete
 			print "<tr>
 				<td class='textArea'>
@@ -314,7 +343,7 @@ function form_actions() {
 				</td>
 			</tr>\n";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph Template(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph Template(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '2') { // duplicate
 			print "<tr>
 				<td class='textArea'>
@@ -324,7 +353,7 @@ function form_actions() {
 				</td>
 			</tr>\n";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue'). "' title='" . __esc('Duplicate Graph Template(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue'). "' title='" . __esc('Duplicate Graph Template(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '3') { // resize
 			print "<tr>
 				<td class='textArea'>
@@ -333,18 +362,20 @@ function form_actions() {
 				</td>
 			</tr>
 			</table>
-			<table>
+			<table class='filterTable'>
 			<tr>
 				<td>";
 
 			print __('Graph Height') . '</td><td>';
 			form_text_box('graph_height', read_config_option('default_graph_height'), '', '5', '5', 'text');
-			print __('Graph Width') . '</td><td>';
+			print '</td></tr><tr><td>' . __('Graph Width') . '</td><td>';
 			form_text_box('graph_width', read_config_option('default_graph_width'), '', '5', '5', 'text');
+			print '</td></tr><tr><td>' . __('Image Format') . '</td><td>';
+			form_dropdown('image_format_id', $image_types, '', '', read_config_option('default_image_format'), '', '');
 
 			print "</td></tr></table><div class='break'></div><table style='width:100%'>\n";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Resize Selected Graph Template(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Resize Selected Graph Template(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '4') { // retemplate
 			print "<tr>
 				<td class='textArea'>
@@ -353,18 +384,19 @@ function form_actions() {
 				</td>
 			</tr>\n";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue'). "' title='" . __esc('Synchronize Graphs to Graph Template(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue'). "' title='" . __esc('Synchronize Graphs to Graph Template(s)') . "'>";
 		}
 	} else {
-		print "<tr><td class='even'><p><span class='textError'>" . __('ERROR: You must select at least one graph template.') . "</span></p></td></tr>\n";
-		$save_html = "<input type='button' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+		raise_message(40);
+		header('Location: graph_templates.php?header=false');
+		exit;
 	}
 
 	print "<tr>
 		<td class='saveRow'>
 			<input type='hidden' name='action' value='actions'>
 			<input type='hidden' name='selected_items' value='" . (isset($graph_array) ? serialize($graph_array) : '') . "'>
-			<input type='hidden' name='drp_action' value='" . get_nfilter_request_var('drp_action') . "'>
+			<input type='hidden' name='drp_action' value='" . html_escape(get_nfilter_request_var('drp_action')) . "'>
 			$save_html
 		</td>
 	</tr>\n";
@@ -390,13 +422,15 @@ function item() {
 	} else {
 		$template_item_list = db_fetch_assoc_prepared("SELECT gti.id, gti.text_format, gti.alpha,
 			gti.value, gti.hard_return, gti.graph_type_id, gti.consolidation_function_id, gti.textalign,
-			CONCAT_WS(' - ', dtd.name, dtr.data_source_name) AS data_source_name,
+			CONCAT(IFNULL(dt.name, ''), ' (', dtr.data_source_name, ')') AS data_source_name,
 			cdef.name AS cdef_name, colors.hex
 			FROM graph_templates_item AS gti
 			LEFT JOIN data_template_rrd AS dtr
 			ON gti.task_item_id=dtr.id
 			LEFT JOIN data_local AS dl
 			ON dtr.local_data_id=dl.id
+			LEFT JOIN data_template AS dt
+			ON dt.id=dtr.data_template_id
 			LEFT JOIN data_template_data AS dtd
 			ON dl.id=dtd.local_data_id
 			LEFT JOIN cdef
@@ -410,7 +444,7 @@ function item() {
 			ORDER BY gti.sequence",
 			array(get_request_var('id')));
 
-		$header_label = __('Graph Template Items [edit: %s]', htmlspecialchars(db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array(get_request_var('id')))));
+		$header_label = __esc('Graph Template Items [edit: %s]', db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array(get_request_var('id'))));
 	}
 
 	html_start_box($header_label, '100%', '', '3', 'center', 'graph_templates_items.php?action=item_edit&graph_template_id=' . get_request_var('id'));
@@ -429,15 +463,15 @@ function item() {
 		ORDER BY name', array(get_request_var('id')));
 
 	$i = 0;
-	if (sizeof($template_item_list) > 0) {
+	if (cacti_sizeof($template_item_list) > 0) {
 		foreach ($template_item_list as $item) {
 			form_alternate_row('', true);
 			?>
 			<td>
-				<a class='linkEditMain' href='<?php print htmlspecialchars('graph_templates_inputs.php?action=input_edit&id=' . $item['id'] . '&graph_template_id=' . get_request_var('id'));?>'><?php print htmlspecialchars($item['name']);?></a>
+				<a class='linkEditMain' href='<?php print html_escape('graph_templates_inputs.php?action=input_edit&id=' . $item['id'] . '&graph_template_id=' . get_request_var('id'));?>'><?php print html_escape($item['name']);?></a>
 			</td>
 			<td class='right'>
-				<a class='deleteMarker fa fa-remove' title='<?php print __esc('Delete');?>' href='<?php print htmlspecialchars('graph_templates_inputs.php?action=input_remove&id=' . $item['id'] . '&graph_template_id=' . get_request_var('id'));?>'></a>
+				<a class='deleteMarker fa fa-times' title='<?php print __esc('Delete');?>' href='<?php print html_escape('graph_templates_inputs.php?action=input_remove&id=' . $item['id'] . '&graph_template_id=' . get_request_var('id'));?>'></a>
 			</td>
 		</tr>
 		<?php
@@ -477,7 +511,7 @@ function template_edit() {
 	}
 
 	if (!isempty_request_var('id')) {
-		$template       = db_fetch_row_prepared('SELECT *
+		$template = db_fetch_row_prepared('SELECT *
 			FROM graph_templates
 			WHERE id = ?',
 			array(get_request_var('id')));
@@ -488,9 +522,9 @@ function template_edit() {
 			AND local_graph_id=0',
 			array(get_request_var('id')));
 
-		$header_label = __('Template [edit: %s]', htmlspecialchars($template['name']));
+		$header_label = __esc('Graph Template [edit: %s]', $template['name']);
 	} else {
-		$header_label = __('Template [new]');
+		$header_label = __('Graph Template [new]');
 	}
 
 	form_start('graph_templates.php', 'graph_templates');
@@ -518,11 +552,12 @@ function template_edit() {
 		}
 
 		$form_array[$field_name]['form_id'] = (isset($template_graph['id']) ? $template_graph['id'] : '0');
+
 		if ($form_array[$field_name]['method'] != 'spacer') {
 			$form_array[$field_name]['sub_checkbox'] = array(
 				'name' => 't_' . $field_name,
-				'friendly_name' => __('Use Per-Graph Value (Ignore this Value)'),
-				'value' => (isset($template_graph['t_' . $field_name]) ? $template_graph{'t_' . $field_name} : '')
+				'friendly_name' => __esc('Check this checkbox if you wish to allow the user to override the value on the right during Graph creation.'),
+				'value' => (isset($template_graph['t_' . $field_name]) ? $template_graph['t_' . $field_name] : '')
 			);
 		}
 	}
@@ -534,7 +569,7 @@ function template_edit() {
 		)
 	);
 
-	form_hidden_box('rrdtool_version', read_config_option('rrdtool_version'), '');
+	form_hidden_box('rrdtool_version', get_rrdtool_version(), '');
 
 	html_end_box(true, true);
 
@@ -584,10 +619,9 @@ function template() {
 			'default' => '1'
 			),
 		'filter' => array(
-			'filter' => FILTER_CALLBACK,
+			'filter' => FILTER_DEFAULT,
 			'pageset' => true,
-			'default' => '',
-			'options' => array('options' => 'sanitize_search_string')
+			'default' => ''
 			),
 		'sort_column' => array(
 			'filter' => FILTER_CALLBACK,
@@ -628,7 +662,7 @@ function template() {
 						<?php print __('Search');?>
 					</td>
 					<td>
-						<input id='filter' type='text' name='filter' size='25' value='<?php print html_escape_request_var('filter');?>'>
+						<input type='text' class='ui-state-default' id='filter' name='filter' size='25' value='<?php print html_escape_request_var('filter');?>'>
 					</td>
 					<td>
 						<?php print __('Graph Templates');?>
@@ -637,9 +671,9 @@ function template() {
 						<select id='rows' name='rows' onChange='applyFilter()'>
 							<option value='-1'<?php print (get_request_var('rows') == '-1' ? ' selected>':'>') . __('Default');?></option>
 							<?php
-							if (sizeof($item_rows)) {
+							if (cacti_sizeof($item_rows)) {
 								foreach ($item_rows as $key => $value) {
-									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . htmlspecialchars($value) . "</option>\n";
+									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . html_escape($value) . "</option>\n";
 								}
 							}
 							?>
@@ -653,8 +687,8 @@ function template() {
 					</td>
 					<td>
 						<span>
-							<input type='button' id='refresh' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
-							<input type='button' id='clear' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='refresh' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='clear' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
 						</span>
 					</td>
 				</tr>
@@ -703,7 +737,7 @@ function template() {
 
 	/* form the 'where' clause for our main sql query */
 	if (get_request_var('filter') != '') {
-		$sql_where = "WHERE (gt.name LIKE '%" . get_request_var('filter') . "%')";
+		$sql_where = 'WHERE (gt.name LIKE ' . db_qstr('%' . get_request_var('filter') . '%') . ')';
 	} else {
 		$sql_where = '';
 	}
@@ -751,7 +785,51 @@ function template() {
 		$sql_order
 		$sql_limit");
 
-	$nav = html_nav_bar('graph_templates.php?filter=' . get_request_var('filter'), MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 8, __('Graph Templates'), 'page', 'main');
+	$display_text = array(
+		'name' => array(
+			'display' => __('Graph Template Name'),
+			'align' => 'left',
+			'sort' => 'ASC',
+			'tip' => __('The name of this Graph Template.')
+		),
+		'gt.id' => array(
+			'display' => __('ID'),
+			'align' => 'right',
+			'sort' => 'ASC',
+			'tip' => __('The internal ID for this Graph Template.  Useful when performing automation or debugging.')
+		),
+		'nosort3' => array(
+			'display' => __('Deletable'),
+			'align' => 'right',
+			'tip' => __('Graph Templates that are in use cannot be Deleted.  In use is defined as being referenced by a Graph.')
+		),
+		'graphs' => array(
+			'display' => __('Graphs Using'),
+			'align' => 'right',
+			'sort' => 'DESC',
+			'tip' => __('The number of Graphs using this Graph Template.')
+		),
+		'size' => array(
+			'display' => __('Size'),
+			'align' => 'right',
+			'sort' => 'ASC',
+			'tip' => __('The default size of the resulting Graphs.')
+		),
+		'image_format_id' => array(
+			'display' => __('Image Format'),
+			'align' => 'right',
+			'sort' => 'ASC',
+			'tip' => __('The default image format for the resulting Graphs.')
+		),
+		'vertical_label' => array(
+			'display' => __('Vertical Label'),
+			'align' => 'right',
+			'sort' => 'ASC',
+			'tip' => __('The vertical label for the resulting Graphs.')
+		)
+	);
+
+	$nav = html_nav_bar('graph_templates.php?filter=' . get_request_var('filter'), MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, sizeof($display_text) + 1, __('Graph Templates'), 'page', 'main');
 
 	form_start('graph_templates.php', 'chk');
 
@@ -759,20 +837,10 @@ function template() {
 
 	html_start_box('', '100%', '', '3', 'center', '');
 
-	$display_text = array(
-		'name'            => array('display' => __('Graph Template Name'), 'align' => 'left', 'sort' => 'ASC', 'tip' => __('The name of this Graph Template.')),
-		'gt.id'           => array('display' => __('ID'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The internal ID for this Graph Template.  Useful when performing automation or debugging.')),
-		'nosort3'         => array('display' => __('Deletable'), 'align' => 'right', 'tip' => __('Graph Templates that are in use cannot be Deleted.  In use is defined as being referenced by a Graph.')),
-		'graphs'          => array('display' => __('Graphs Using'), 'align' => 'right', 'sort' => 'DESC', 'tip' => __('The number of Graphs using this Graph Template.')),
-		'size'            => array('display' => __('Size'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The default size of the resulting Graphs.')),
-		'image_format_id' => array('display' => __('Image Format'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The default image format for the resulting Graphs.')),
-		'vertical_label'  => array('display' => __('Vertical Label'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The vertical label for the resulting Graphs.'))
-	);
-
 	html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false);
 
 	$i = 0;
-	if (sizeof($template_list)) {
+	if (cacti_sizeof($template_list)) {
 		foreach ($template_list as $template) {
 			if ($template['graphs'] > 0) {
 				$disabled = true;
@@ -781,22 +849,21 @@ function template() {
 			}
 			form_alternate_row('line' . $template['id'], true, $disabled);
 			form_selectable_cell(filter_value($template['name'], get_request_var('filter'), 'graph_templates.php?action=template_edit&id=' . $template['id']), $template['id']);
-			form_selectable_cell($template['id'], $template['id'], '', 'text-align:right');
-			form_selectable_cell($disabled ? __('No'):__('Yes'), $template['id'], '', 'text-align:right');
-			form_selectable_cell(number_format_i18n($template['graphs'], '-1'), $template['id'], '', 'text-align:right');
-			//form_selectable_cell('<a class="linkEditMain" href="' . htmlspecialchars('graphs.php?reset=true&template_id=' . ($template['dqid'] > 0 ? 'dq_':'') . $template['id']) . '">' . number_format_i18n($template['graphs'], '-1') . '</a>', $template['id'], '', 'text-align:right');
-			form_selectable_cell($template['size'], $template['id'], '', 'text-align:right');
-			form_selectable_cell($image_types[$template['image_format_id']], $template['id'], '', 'text-align:right');
-			form_selectable_cell($template['vertical_label'], $template['id'], '', 'text-align:right');
+			form_selectable_cell($template['id'], $template['id'], '', 'right');
+			form_selectable_cell($disabled ? __('No'):__('Yes'), $template['id'], '', 'right');
+			form_selectable_cell(number_format_i18n($template['graphs'], '-1'), $template['id'], '', 'right');
+			form_selectable_ecell($template['size'], $template['id'], '', 'right');
+			form_selectable_cell($image_types[$template['image_format_id']], $template['id'], '', 'right');
+			form_selectable_ecell($template['vertical_label'], $template['id'], '', 'right');
 			form_checkbox_cell($template['name'], $template['id'], $disabled);
 			form_end_row();
 		}
 	} else {
-		print "<tr class='tableRow'><td colspan='4'><em>" . __('No Graph Templates Found') . "</em></td></tr>\n";
+		print "<tr class='tableRow'><td colspan='" . (cacti_sizeof($display_text)+1) . "'><em>" . __('No Graph Templates Found') . "</em></td></tr>\n";
 	}
 	html_end_box(false);
 
-	if (sizeof($template_list)) {
+	if (cacti_sizeof($template_list)) {
 		print $nav;
 	}
 

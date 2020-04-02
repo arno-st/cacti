@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -22,6 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
+define('CACTI_IN_INSTALL', 1);
 include('./include/auth.php');
 
 global $config;
@@ -31,41 +32,25 @@ set_default_action();
 api_plugin_hook('logout_pre_session_destroy');
 
 /* Clear session */
-setcookie(session_name(), '', time() - 3600, $config['url_path']);
-session_destroy();
+cacti_cookie_logout();
+cacti_session_destroy();
 
 $version = get_cacti_version();
 
 api_plugin_hook('logout_post_session_destroy');
 
+/* allow for plugin based logout page */
+if (api_plugin_hook_function('custom_logout_message', OPER_MODE_NATIVE) === OPER_MODE_RESKIN) {
+	exit;
+}
+
 /* Check to see if we are using Web Basic Auth */
 if (get_request_var('action') == 'timeout') {
-	$selectedTheme = get_selected_theme();
-
-	print "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>\n";
-	print "<html>\n";
-	print "<head>\n";
-	print "\t<title>Logout of Cacti</title>\n";
-	print "\t<meta http-equiv='Content-Type' content='text/html;charset=utf-8'>\n";
-    print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/jquery-ui.css' type='text/css' rel='stylesheet'>\n";
-	print "\t<link href='" . $config['url_path'] . "include/fa/css/font-awesome.css' type='text/css' rel='stylesheet'>\n";
-	print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/main.css' type='text/css' rel='stylesheet'>\n";
-	print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/images/favicon.ico' rel='shortcut icon'>\n";
-	print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/images/cacti_logo.gif' rel='icon' sizes='96x96'>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery-migrate.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery-ui.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.cookie.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.widgets.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.pager.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/js.storage.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.hotkeys.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/layout.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/main.js'></script>\n";
-	print "<script type='text/javascript'>var theme='" . $selectedTheme . "';</script>\n";
-	print "</head>\n";
+	print "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>";
+	print "<html>";
+	print "<head>";
+	html_common_header(__('Logout of Cacti'));
+	print "</head>";
 	print "<body class='logoutBody'>
 	<div class='logoutLeft'></div>
 	<div class='logoutCenter'>
@@ -83,66 +68,51 @@ if (get_request_var('action') == 'timeout') {
 	<div class='logoutRight'></div>
 	<script type='text/javascript'>
 	$(function() {
+		if (typeof myRefresh != 'undefined') {
+			clearTimeout(myRefresh);
+		}
+
 		$('.loginLeft').css('width',parseInt($(window).width()*0.33)+'px');
 		$('.loginRight').css('width',parseInt($(window).width()*0.33)+'px');
 	});
 	</script>";
 	include('./include/global_session.php');
 	print "</body>
-	</html>\n";
-} elseif (read_config_option('auth_method') == '2') {
-	clear_auth_cookie();
-
-	if (api_plugin_hook_function('custom_logout_message', OPER_MODE_NATIVE) == OPER_MODE_RESKIN) {
-		exit;
-	}
-
-	$selectedTheme = get_selected_theme();
-
-	print "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>\n";
-	print "<html>\n";
-	print "<head>\n";
-	print "\t<title>Logout of Cacti</title>\n";
-	print "\t<meta http-equiv='Content-Type' content='text/html;charset=utf-8'>\n";
-	print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/main.css' type='text/css' rel='stylesheet'>\n";
-    print "\t<link href='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/jquery-ui.css' type='text/css' rel='stylesheet'>\n";
-	print "\t<link href='" . $config['url_path'] . "images/favicon.ico' rel='shortcut icon'>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery-migrate.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery-ui.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.cookie.js' language='javascript'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.widgets.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.tablesorter.pager.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/js.storage.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/js/jquery.hotkeys.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/layout.js'></script>\n";
-	print "\t<script type='text/javascript' src='" . $config['url_path'] . "include/themes/" . $selectedTheme . "/main.js'></script>\n";
-	print "<script type='text/javascript'>var theme='" . $selectedTheme . "';</script>\n";
-	print "</head>\n";
+	</html>";
+} elseif (get_request_var('action') == 'disabled') {
+	print "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>";
+	print "<html>";
+	print "<head>";
+	html_common_header(__('Logout of Cacti'));
+	print "</head>";
 	print "<body class='logoutBody'>
 	<div class='logoutLeft'></div>
 	<div class='logoutCenter'>
 		<div class='logoutArea'>
-			<div class='cactiLogoutLogo'></div>
+			<div class='cactiLogoutLogo cactiLoginSuspend'></div>
 			<legend>" . __('Automatic Logout') . "</legend>
 			<div class='logoutTitle'>
-				<p>" . __('You have been logged out of Cacti due to a session timeout.') . "</p>
+				<p>" . __('You have been logged out of Cacti due to an account suspension.') . "</p>
 				<p>" . __('Please close your browser or %sLogin Again%s', '</p><center>[<a href="index.php">', '</a>]</center>') . "
 			</div>
 			<div class='logoutErrors'></div>
 		</div>
+		<div class='versionInfo'>" . __('Version %s', $version) . " | " . COPYRIGHT_YEARS_SHORT . "</div>
 	</div>
 	<div class='logoutRight'></div>
 	<script type='text/javascript'>
 	$(function() {
+		if (typeof myRefresh != 'undefined') {
+			clearTimeout(myRefresh);
+		}
+
 		$('.loginLeft').css('width',parseInt($(window).width()*0.33)+'px');
 		$('.loginRight').css('width',parseInt($(window).width()*0.33)+'px');
 	});
 	</script>";
 	include('./include/global_session.php');
 	print "</body>
-	</html>\n";
+	</html>";
 } else {
 	/* Default action */
 	clear_auth_cookie();

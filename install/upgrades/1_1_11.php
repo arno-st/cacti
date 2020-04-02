@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -29,5 +29,5 @@ function upgrade_to_1_1_11() {
 
 	// required for tne new plugin structure
 	db_install_execute('DELETE FROM settings WHERE name LIKE "md5%_plugins"');
-	db_install_execute('DELETE FROM poller_resource_cache WHERE path LIKE "plugins/%"');
+	db_install_execute('DELETE FROM poller_resource_cache WHERE `path` LIKE "plugins/%"');
 }

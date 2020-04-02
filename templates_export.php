@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -60,7 +60,7 @@ function form_save() {
 		if (get_nfilter_request_var('output_format') == '1') {
 			top_header();
 
-			print "<table style='width:100%;' class='center'><tr><td style='text-align:left;'><pre>" . htmlspecialchars($xml_data) . '</pre></td></tr></table>';
+			print "<table style='width:100%;' class='center'><tr><td style='text-align:left;'><pre>" . html_escape($xml_data) . '</pre></td></tr></table>';
 
 			bottom_footer();
 		} elseif (get_nfilter_request_var('output_format') == '2') {
@@ -72,7 +72,7 @@ function form_save() {
 				header('Location: templates_export.php');
 			} else {
 				header('Content-type: application/xml');
-				header('Content-Disposition: attachment; filename=cacti_' . get_nfilter_request_var('export_type') . '_' . strtolower(clean_up_file_name(db_fetch_cell(str_replace('|id|', get_nfilter_request_var('export_item_id'), $export_types{get_nfilter_request_var('export_type')}['title_sql'])))) . '.xml');
+				header('Content-Disposition: attachment; filename=cacti_' . get_nfilter_request_var('export_type') . '_' . strtolower(clean_up_file_name(db_fetch_cell(str_replace('|id|', get_nfilter_request_var('export_item_id'), $export_types[get_nfilter_request_var('export_type')]['title_sql'])))) . '.xml');
 				print $xml_data;
 			}
 		}
@@ -91,8 +91,17 @@ function export() {
 		set_request_var('export_type', 'host_template');
 	}
 
+	$type_found = false;
+
 	foreach($export_types as $id => $type) {
 		$export_array[$id] = $type['name'];
+		if (get_nfilter_request_var('export_type') == $id) {
+			$type_found = true;
+		}
+	}
+
+	if (!$type_found) {
+		set_request_var('export_type', 'host_template');
 	}
 
 	$form_template_export1 = array(
@@ -100,13 +109,11 @@ function export() {
 			'friendly_name' => __('What would you like to export?'),
 			'description' => __('Select the Template type that you wish to export from Cacti.'),
 			'method' => 'drop_array',
-			'value' => get_request_var('export_type'),
+			'value' => get_nfilter_request_var('export_type'),
 			'array' => $export_array,
 			'default' => 'host_template'
 		)
 	);
-
-	$export_item_ids = db_fetch_assoc($export_types{get_nfilter_request_var('export_type')}['dropdown_sql']);
 
 	$form_template_export2 = array(
 		'export_item_id' => array(
@@ -160,7 +167,7 @@ function export() {
 
 	html_end_box();
 
-	html_start_box( __('Available Templates [%s]', $export_types{get_nfilter_request_var('export_type')}['name']), '100%', '', '3', 'center', '');
+	html_start_box( __('Available Templates [%s]', $export_types[get_nfilter_request_var('export_type')]['name']), '100%', '', '3', 'center', '');
 
 	draw_edit_form(
 		array(
@@ -186,4 +193,3 @@ function export() {
 
 	form_save_button('', 'export', '', false);
 }
-

@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,7 +23,7 @@
 */
 
 function upgrade_to_0_8_6g() {
-	/* changes for even longer OID's */
+	/* changes for even longer OIDs */
 	db_install_execute("ALTER TABLE `host_snmp_cache` CHANGE `snmp_index` `snmp_index` VARCHAR( 255 ) NOT NULL;");
 	db_install_execute("ALTER TABLE `data_local` CHANGE `snmp_index` `snmp_index` VARCHAR( 255 ) NOT NULL;");
 	db_install_execute("ALTER TABLE `graph_local` CHANGE `snmp_index` `snmp_index` VARCHAR( 255 ) NOT NULL;");

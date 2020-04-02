@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -84,6 +84,7 @@ function aggregate_color_item_form_save() {
 	if (isset_request_var('save_component_item')) {
 		/* ================= input validation ================= */
 		get_filter_request_var('color_template_id');
+		get_filter_request_var('color_template_item_id');
 		get_filter_request_var('sequence');
 		/* ==================================================== */
 
@@ -96,8 +97,8 @@ function aggregate_color_item_form_save() {
 				$sequence = get_next_sequence($sequence, 'sequence', 'color_template_items', 'color_template_id=' . get_nfilter_request_var('color_template_id'), 'color_template_id');
 			}
 
-			$save['color_template_item_id'] = htmlspecialchars(get_nfilter_request_var('color_template_item_id'));
-			$save['color_template_id'] = htmlspecialchars(get_nfilter_request_var('color_template_id'));
+			$save['color_template_item_id'] = html_escape_request_var('color_template_item_id');
+			$save['color_template_id'] = html_escape_request_var('color_template_id');
 			$save['color_id'] = form_input_validate((isset($item['color_id']) ? $item['color_id'] : get_nfilter_request_var('color_id')), 'color_id', '', true, 3);
 			$save['sequence'] = $sequence;
 
@@ -132,40 +133,23 @@ function color_templates_item_dnd() {
     get_filter_request_var('id');
     /* ================= Input validation ================= */
 
-    if (!isset_request_var('color_item') || !is_array(get_nfilter_request_var('color_item'))) exit;
+    if (isset_request_var('color_item') && is_array(get_nfilter_request_var('color_item'))) {
+		$color_items = get_nfilter_request_var('color_item');
 
-    /* snmp table contains one row defined as 'nodrag&nodrop' */
-    unset($_REQUEST['color_item'][0]);
+		if (cacti_sizeof($color_items)) {
+			$sequence = 1;
 
-    /* delivered vdef ids has to be exactly the same like we have stored */
-    $old_order = array();
+		    foreach($color_items as $option_id) {
+        		$option = str_replace('line', '', $option_id);
 
-    foreach(get_nfilter_request_var('color_item') as $sequence => $option_id) {
-        if (empty($option_id)) continue;
-        $new_order[$sequence] = str_replace('line', '', $option_id);
-    }
+		        db_execute_prepared('UPDATE color_template_items
+					SET sequence = ?
+					WHERE color_template_item_id = ?',
+					array($sequence, $option));
 
-    $color_items = db_fetch_assoc_prepared('SELECT color_template_item_id, sequence FROM color_template_items WHERE color_template_id = ?', array(get_request_var('id')));
-
-    if (sizeof($color_items)) {
-        foreach($color_items as $item) {
-            $old_order[$item['sequence']] = $item['color_template_item_id'];
-        }
-    }else {
-        exit;
-    }
-
-    if (sizeof(array_diff($new_order, $old_order))>0) exit;
-
-    /* the set of sequence numbers has to be the same too */
-    if (sizeof(array_diff_key($new_order, $old_order))>0) exit;
-    /* ==================================================== */
-
-    foreach($new_order as $sequence => $color_template_item_id) {
-        input_validate_input_number($sequence);
-        input_validate_input_number($color_template_item_id);
-
-        db_execute_prepared('UPDATE color_template_items SET sequence = ? WHERE color_template_item_id = ?', array($sequence, $color_template_item_id));
+				$sequence++;
+			}
+		}
     }
 
     header('Location: color_templates.php?action=template_edit&header=false&color_template_id=' . get_request_var('id'));
@@ -187,7 +171,7 @@ function aggregate_color_item_movedown() {
 		array(get_request_var('color_template_item_id')));
 
 	cacti_log('movedown Id: ' . $current_sequence['color_template_item_id'] . ' Seq:' . $current_sequence['sequence'],
-		FALSE, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
+		false, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
 
 	$next_sequence = db_fetch_row_prepared('SELECT color_template_item_id, sequence
 		FROM color_template_items
@@ -197,7 +181,7 @@ function aggregate_color_item_movedown() {
 		array($current_sequence['sequence'], get_request_var('color_template_id')));
 
 	cacti_log('movedown Id: ' . $next_sequence['color_template_item_id'] . ' Seq:' . $next_sequence['sequence'],
-		FALSE, POLLER_VERBOSITY_DEBUG);
+		false, POLLER_VERBOSITY_DEBUG);
 
 	db_execute_prepared('UPDATE color_template_items
 		SET sequence = ?
@@ -228,7 +212,7 @@ function aggregate_color_item_moveup() {
 		array(get_request_var('color_template_item_id')));
 
 	cacti_log('moveup Id: ' . $current_sequence['color_template_item_id'] . ' Seq:' . $current_sequence['sequence'],
-		FALSE, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
+		false, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
 
 	$previous_sequence = db_fetch_row_prepared('SELECT color_template_item_id, sequence
 		FROM color_template_items
@@ -238,7 +222,7 @@ function aggregate_color_item_moveup() {
 		array($current_sequence['sequence'], get_request_var('color_template_id')));
 
 	cacti_log('moveup Id: ' . $previous_sequence['color_template_item_id'] . ' Seq:' . $previous_sequence['sequence'],
-		FALSE, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
+		false, 'AGGREGATE', POLLER_VERBOSITY_DEBUG);
 
 	db_execute_prepared('UPDATE color_template_items
 		SET sequence = ?
@@ -276,9 +260,9 @@ function aggregate_color_item_remove_confirm() {
 		</td>
 	</tr>
 	<tr>
-		<td align='right'>
-			<input id='cancel' type='button' value='<?php print __esc('Cancel');?>' onClick='$("#cdialog").dialog("close");' name='cancel'>
-			<input id='continue' type='button' value='<?php print __esc('Continue');?>' name='continue' title='<?php print __esc('Remove Color Item');?>'>
+		<td class='right'>
+			<input type='button' class='ui-button ui-corner-all ui-widget' id='cancel' value='<?php print __esc('Cancel');?>' onClick='$("#cdialog").dialog("close");' name='cancel'>
+			<input type='button' class='ui-button ui-corner-all ui-widget' id='continue' value='<?php print __esc('Continue');?>' name='continue' title='<?php print __esc('Remove Color Item');?>'>
 		</td>
 	</tr>
 	<?php
@@ -290,8 +274,6 @@ function aggregate_color_item_remove_confirm() {
 	?>
 	<script type='text/javascript'>
 	$(function() {
-		$('#cdialog').dialog();
-
 		$('#continue').click(function(data) {
 			$.post('color_templates_items.php?action=item_remove', {
 				__csrf_magic: csrfMagicToken,
@@ -336,10 +318,10 @@ function aggregate_color_item_edit() {
 
 	if (isset_request_var('color_template_item_id') && (get_request_var('color_template_item_id') > 0)) {
 		$template_item = db_fetch_row_prepared('SELECT * FROM color_template_items WHERE color_template_item_id = ?', array(get_request_var('color_template_item_id')));
-		$header_label = __('Color Template Items [edit Report Item: %s]', $template['name']);
+		$header_label = __esc('Color Template Items [edit Report Item: %s]', $template['name']);
 	} else {
 		$template_item = array();
-		$header_label = __('Color Template Items [new Report Item: %s]', $template['name']);
+		$header_label = __esc('Color Template Items [new Report Item: %s]', $template['name']);
 	}
 
 	form_start('color_templates_items.php', 'aggregate_color_item_edit');

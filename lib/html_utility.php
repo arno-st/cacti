@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -41,7 +41,7 @@ function inject_form_variables(&$form_array, $arg1 = array(), $arg2 = array(), $
 	$check_fields = array('id', 'value', 'array', 'friendly_name', 'description', 'sql', 'sql_print', 'form_id', 'items', 'tree_id');
 
 	/* loop through each available field */
-	if (sizeof($form_array)) {
+	if (cacti_sizeof($form_array)) {
 		foreach ($form_array as $field_name => $field_array) {
 			/* loop through each sub-field that we are going to check for variables */
 			foreach ($check_fields as $field_to_check) {
@@ -49,39 +49,64 @@ function inject_form_variables(&$form_array, $arg1 = array(), $arg2 = array(), $
 					/* if the field/sub-field combination is an array, resolve it recursively */
 					$form_array[$field_name][$field_to_check] = inject_form_variables($form_array[$field_name][$field_to_check], $arg1);
 				} elseif (isset($field_array[$field_to_check]) && !is_array($field_array[$field_to_check]) && preg_match('/\|(arg[123]):([a-zA-Z0-9_]*)\|/', $field_array[$field_to_check], $matches)) {
-					$string = $field_array[$field_to_check];
+					$string   = $field_array[$field_to_check];
+					$matches0 = $matches[0];
+					$matches1 = $matches[1];
+					$matches2 = $matches[2];
 
 					$count = 0;
+					/* loop through the $field_to_check and replace upto three times
+					 * for arg1:arg2:arg3 variables.
+					 */
 					while (true) {
 						/* an empty field name in the variable means don't treat this as an array */
-						if ($matches[2] == '') {
-							if (is_array(${$matches[1]})) {
+						if ($matches2 == '') {
+							if (is_array($$matches1)) {
 								/* the existing value is already an array, leave it alone */
-								$form_array[$field_name][$field_to_check] = ${$matches[1]};
-								break;
+								$form_array[$field_name][$field_to_check] = $$matches1;
 							} else {
 								/* the existing value is probably a single variable */
-								$form_array[$field_name][$field_to_check] = str_replace($matches[0], ${$matches[1]}, $field_array[$field_to_check]);
-								break;
+								$form_array[$field_name][$field_to_check] = str_replace($matches0, $$matches1, $field_array[$field_to_check]);
 							}
 						} else {
-							/* copy the value down from the array/key specified in the variable */
-							$string = str_replace($matches[0], (isset(${$matches[1]}{$matches[2]}) ? ${$matches[1]}{$matches[2]} : ''), $string);
+							/* copy the value down from the array/key specified in the variable
+							 * replace upto three times for arg1:arg2:arg3 variables
+							 */
+							if (isset($$matches1) && is_array($$matches1)) {
+								$array = $$matches1;
+								if (is_array($array) && isset($array[$matches2]) && $array[$matches2] != '') {
+									$string = str_replace($matches0, $array[$matches2], $string);
+								} else {
+									$string = str_replace($matches0, '', $string);
+								}
+							}
 
+							// Double check to see if the replacement went as planned
 							$matches = array();
-
 							preg_match('/\|(arg[123]):([a-zA-Z0-9_]*)\|/', $string, $matches);
 
-							if (!sizeof($matches)) {
+							if (!cacti_sizeof($matches)) {
 								$form_array[$field_name][$field_to_check] = $string;
-								break;
+							} elseif (isset($form_array[$field_name]['default'])) {
+								$form_array[$field_name][$field_to_check] = $form_array[$field_name]['default'];
+							} elseif ($field_to_check == 'sql') {
+								$form_array[$field_name][$field_to_check] = $string;
+							} else {
+								$form_array[$field_name][$field_to_check] = '';
 							}
 						}
 
-						$count++;
-
-						if ($count > 3) {
+						/* if there are no more arg's, break.  Since some arg's
+						 * might not ever be replaced, continue counting till 3 as
+						 * in the special case of 'sql' for example.
+						 */
+						$additional = preg_match('/\|(arg[123]):([a-zA-Z0-9_]*)\|/', $string);
+						if (empty($additional)) {
 							break;
+						} elseif ($count >= 3) {
+							break;
+						} else {
+							$count++;
 						}
 					}
 				}
@@ -149,6 +174,16 @@ function form_alternate_row($row_id = '', $light = false, $disabled = false) {
 	}
 }
 
+/* form_selectable_ecell - a wrapper to form_selectable_cell that escapes the contents
+   @arg $contents - the readable portion of the
+   @arg $id - the id of the object that will be highlighted
+   @arg $width - the width of the table element
+   @arg $style_or_class - the style or class to apply to the table element
+   @arg $title - optional title for the column */
+function form_selectable_ecell($contents, $id, $width = '', $style_or_class = '', $title = '') {
+	form_selectable_cell(html_escape($contents), $id, $width, $style_or_class, $title);
+}
+
 /* form_selectable_cell - format's a table row such that it can be highlighted using cacti's js actions
    @arg $contents - the readable portion of the
    @arg $id - the id of the object that will be highlighted
@@ -173,6 +208,10 @@ function form_selectable_cell($contents, $id, $width = '', $style_or_class = '',
 		}
 	} else {
 		$output = 'class="nowrap"';
+
+		if ($width != '') {
+			$output .= " style='width:$width;'";
+		}
 	}
 
 	if ($title != '') {
@@ -188,7 +227,7 @@ function form_selectable_cell($contents, $id, $width = '', $style_or_class = '',
    @arg $title - the text that will be displayed if your hover over the checkbox */
 function form_checkbox_cell($title, $id, $disabled = false) {
 	print "\t<td class='checkbox' style='width:1%;'>\n";
-	print "\t\t<input type='checkbox' class='checkbox" . ($disabled ? ' disabled':'') . "' " . ($disabled ? "disabled='disabled'":'') . " id='chk_" . $id . "' name='chk_" . $id . "'><label class='formCheckboxLabel' for='chk_" . $id . "'></label>\n";
+	print "\t\t<input type='checkbox' title='" . html_escape($title) . "' class='checkbox" . ($disabled ? ' disabled':'') . "' " . ($disabled ? "disabled='disabled'":'') . " id='chk_" . $id . "' name='chk_" . $id . "'><label class='formCheckboxLabel' for='chk_" . $id . "'></label>\n";
 	print "\t</td>\n";
 }
 
@@ -205,9 +244,9 @@ function form_confim_buttons($post_variable, $item_array, $save_message, $return
 			<input type='hidden' name='action' value='actions'>
 			<input type='hidden' name='selected_items' value='" . (isset($item_array) ? serialize($item_array) : '') . "'>
 			<input type='hidden' name='drp_action' value='" . $post_variable . "'>" . ($return ? "
-			<input type='button' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>
+			<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>
 			":"
-			<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') ."' title='$save_message'>") . "
+			<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') ."' title='$save_message'>") . "
 		</td>
 	</tr>\n";
 }
@@ -246,6 +285,12 @@ function get_checkbox_style() {
 function set_default_action($default = '') {
 	if (!isset_request_var('action')) {
 		set_request_var('action', $default);
+	} elseif (is_array(get_nfilter_request_var('action'))) {
+		if (read_config_option('log_validation') == 'on') {
+			cacti_log('WARNING: Request variable \'action\' was passed as array in ' . $_SERVER['SCRIPT_NAME'] . '.', false, 'WEBUI');
+		}
+
+		set_request_var('action', $_REQUEST['action'][0]);
 	} else {
 		set_request_var('action', $_REQUEST['action']);
 	}
@@ -305,7 +350,7 @@ function set_request_var($variable, $value) {
 
 /* get_request_var - returns the current value of a PHP $_REQUEST variable, optionally
      returning a default value if the request variable does not exist.  When Cacti
-     is set to 'developer_mode', it will log all instances where a request variable
+     has 'log_validation' set on, it will log all instances where a request variable
      has not first been filtered.
    @arg $name - the name of the request variable. this should be a valid key in the
      $_REQUEST array
@@ -315,12 +360,12 @@ function set_request_var($variable, $value) {
 function get_request_var($name, $default = '') {
 	global $_CACTI_REQUEST;
 
-	$developer = read_config_option('developer_mode');
+	$log_validation = read_config_option('log_validation');
 
 	if (isset($_CACTI_REQUEST[$name])) {
 		return $_CACTI_REQUEST[$name];
 	} elseif (isset_request_var($name)) {
-		if ($developer == 'on') {
+		if ($log_validation == 'on') {
 			html_log_input_error($name);
 		}
 
@@ -379,11 +424,15 @@ function get_filter_request_var($name, $filter = FILTER_VALIDATE_INT, $options =
 			} elseif (isempty_request_var($name)) {
 				$value = '';
 			} elseif ($filter == FILTER_VALIDATE_IS_REGEX) {
+				if (is_base64_encoded($_REQUEST[$name])) {
+					$_REQUEST[$name] = base64_decode($_REQUEST[$name]);
+				}
+
 				$valid = validate_is_regex($_REQUEST[$name]);
 				if ($valid === true) {
 					$value = $_REQUEST[$name];
 				} else {
-					$value = FALSE;
+					$value = false;
 					$custom_error = $valid;
 				}
 			} elseif ($filter == FILTER_VALIDATE_IS_NUMERIC_ARRAY) {
@@ -406,7 +455,7 @@ function get_filter_request_var($name, $filter = FILTER_VALIDATE_INT, $options =
 				}
 			} elseif ($filter == FILTER_VALIDATE_IS_NUMERIC_LIST) {
 				$valid = true;
-				$values = explode(',', $_REQUEST[$name]);
+				$values = preg_split('/,/', $_REQUEST[$name], NULL, PREG_SPLIT_NO_EMPTY);
 				foreach($values AS $number) {
 					if (!is_numeric($number)) {
 						$valid = false;
@@ -419,7 +468,7 @@ function get_filter_request_var($name, $filter = FILTER_VALIDATE_INT, $options =
 				} else {
 					$value = false;
 				}
-			} elseif (!sizeof($options)) {
+			} elseif (!cacti_sizeof($options)) {
 				$value = filter_var($_REQUEST[$name], $filter);
 			} else {
 				$value = filter_var($_REQUEST[$name], $filter, $options);
@@ -428,9 +477,8 @@ function get_filter_request_var($name, $filter = FILTER_VALIDATE_INT, $options =
 
 		if ($value === false) {
 			if ($filter == FILTER_VALIDATE_IS_REGEX) {
-				$_SESSION['custom_error'] = __('The search term "%s" is not valid. Error is %s', get_nfilter_request_var($name), $cusom_error);
+				raise_message('custom', __('The regular expression "%s" is not valid. Error is %s', html_escape(get_nfilter_request_var($name)), html_escape($custom_error)), MESSAGE_LEVEL_ERROR);
 				set_request_var($name, '');
-				raise_message('custom_error');
 			} else {
 				die_html_input_error($name, get_nfilter_request_var($name));
 			}
@@ -518,7 +566,7 @@ function get_request_var_post($name, $default = '') {
    allows for the concept of global session variables such as
    'sess_default_rows'.
 
-   Validateion 'filter' follow PHP conventions including:
+   Validation 'filter' follow PHP conventions including:
 
      FILTER_VALIDATE_BOOLEAN          - Validate that the variable is boolean
      FILTER_VALIDATE_EMAIL            - Validate that the variable is an email
@@ -552,7 +600,7 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 	$changed = 0;
 	$custom_error = '';
 
-	if (sizeof($filters)) {
+	if (cacti_sizeof($filters)) {
 		foreach($filters as $variable => $options) {
 			// Establish the session variable first
 			if ($sess_prefix != '') {
@@ -570,7 +618,7 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 					unset_request_var($variable);
 				} elseif (isset_request_var('reset')) {
 					kill_session_var($session_variable);
-				} elseif (isset($options['pageset'])) {
+				} elseif (isset($options['pageset']) && $options['pageset'] == true) {
 					$changed += check_changed($variable, $session_variable);
 				}
 			}
@@ -596,6 +644,10 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 				} elseif (isempty_request_var($variable)) {
 					$value = '';
 				} elseif ($options['filter'] == FILTER_VALIDATE_IS_REGEX) {
+					if (is_base64_encoded($_REQUEST[$variable])) {
+						$_REQUEST[$variable] = base64_decode($_REQUEST[$variable]);
+					}
+
 					$valid = validate_is_regex($_REQUEST[$variable]);
 					if ($valid === true) {
 						$value = $_REQUEST[$variable];
@@ -623,7 +675,7 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 					}
 				} elseif ($options['filter'] == FILTER_VALIDATE_IS_NUMERIC_LIST) {
 					$valid = true;
-					$values = explode(',', $_REQUEST[$variable]);
+					$values = preg_split('/,/', $_REQUEST[$variable], NULL, PREG_SPLIT_NO_EMPTY);
 					foreach($values AS $number) {
 						if (!is_numeric($number)) {
 							$valid = false;
@@ -644,11 +696,10 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 
 				if ($value === false) {
 					if ($options['filter'] == FILTER_VALIDATE_IS_REGEX) {
-						$_SESSION['custom_error'] = __('The search term "%s" is not valid. Error is %s', get_nfilter_request_var($variable), $custom_error);
+						raise_message('custom', __('The regular expression "%s" is not valid. Error is %s', html_escape(get_nfilter_request_var($variable)), html_escape($custom_error)), MESSAGE_LEVEL_ERROR);
 						set_request_var($variable, '');
-						raise_message('custom_error');
 					} else {
-						die_html_input_error($variable, get_nfilter_request_var($variable), $custom_error);
+						die_html_input_error($variable, get_nfilter_request_var($variable), html_escape($custom_error));
 					}
 				} else {
 					set_request_var($variable, $value);
@@ -670,6 +721,9 @@ function validate_store_request_vars($filters, $sess_prefix = '') {
 	if ($changed) {
 		set_request_var('page', 1);
 		set_request_var('changed', 1);
+		$_SESSION[$sess_prefix . '_page'] = 1;
+	} elseif (!isset_request_var('page') && isset($_SESSION[$sess_prefix . '_page'])) {
+		set_request_var('page', $_SESSION[$sess_prefix . '_page']);
 	}
 }
 
@@ -707,8 +761,23 @@ function update_order_string($inplace = false) {
 			$_SESSION['sort_data'][$page][get_request_var('sort_column')] = get_request_var('sort_direction');
 			$_SESSION['sort_string'][$page] = 'ORDER BY ' . $del . implode($del . '.'. $del, explode('.', get_request_var('sort_column'))) . $del . ' ' . get_request_var('sort_direction');
 		} elseif (isset_request_var('sort_column')) {
+			if (isset_request_var('reset')) {
+				unset($_SESSION['sort_data'][$page]);
+				unset($_SESSION['sort_string'][$page]);
+			}
+
 			$_SESSION['sort_data'][$page][get_request_var('sort_column')] = get_nfilter_request_var('sort_direction');
 			$_SESSION['sort_string'][$page] = 'ORDER BY ';
+
+			foreach($_SESSION['sort_data'][$page] as $column => $direction) {
+				if (strpos($column, '(') === false && strpos($column, '`') === false) {
+					$del = '`';
+				} else {
+					$del = '';
+					break;
+				}
+			}
+
 			foreach($_SESSION['sort_data'][$page] as $column => $direction) {
 				if ($column == 'hostname' || $column == 'ip' || $column == 'ip_address') {
 					$order .= ($order != '' ? ', ':'') . 'INET_ATON(' . $column . ") " . $direction;
@@ -745,8 +814,8 @@ function get_order_string() {
 function remove_column_from_order_string($column) {
 	$page = get_order_string_page();
 
-	if (isset($_SESSIION['sort_data'][$page][$column])) {
-		unset($_SESSIION['sort_data'][$page][$column]);
+	if (isset($_SESSION['sort_data'][$page][$column])) {
+		unset($_SESSION['sort_data'][$page][$column]);
 		update_order_string(true);
 	}
 }
@@ -766,8 +835,6 @@ function get_order_string_page() {
 }
 
 function validate_is_regex($regex) {
-	global $php_errormsg;
-
 	if ($regex == '') {
 		return true;
 	}
@@ -777,12 +844,14 @@ function validate_is_regex($regex) {
 	$track_errors = ini_get('track_errors');
 	ini_set('track_errors', 1);
 
-    if(@preg_match("'" . $regex . "'", NULL) !== false) {
+    if (@preg_match("'" . $regex . "'", NULL) !== false) {
 		ini_set('track_errors', $track_errors);
 		return true;
 	}
 
-	$php_error = trim(str_replace('preg_match():', '', $php_errormsg));
+	$last_error = error_get_last();
+
+	$php_error = trim(str_replace('preg_match():', '', $last_error['message']));
 
 	ini_set('track_errors', $track_errors);
 
@@ -856,7 +925,7 @@ function get_colored_device_status($disabled, $status) {
      the timespan selector
    @returns - the number of seconds relative to now where the graph should begin */
 function get_current_graph_start() {
-	if (isset($_SESSION['sess_current_timespan_begin_now'])) {
+	if (isset($_SESSION['sess_current_timespan_begin_now']) && is_numeric($_SESSION['sess_current_timespan_begin_now'])) {
 		return $_SESSION['sess_current_timespan_begin_now'];
 	} else {
 		return '-' . DEFAULT_TIMESPAN;
@@ -867,7 +936,7 @@ function get_current_graph_start() {
      the timespan selector
    @returns - the number of seconds relative to now where the graph should end */
 function get_current_graph_end() {
-	if (isset($_SESSION['sess_current_timespan_end_now'])) {
+	if (isset($_SESSION['sess_current_timespan_end_now']) && is_numeric($_SESSION['sess_current_timespan_end_now'])) {
 		return $_SESSION['sess_current_timespan_end_now'];
 	} else {
 		return '0';
@@ -878,7 +947,11 @@ function get_current_graph_end() {
    @arg $text - the text to display in the tooltip
    @returns - null */
 function display_tooltip($text) {
-	return '<div class="cactiTooltipHint fa fa-question-circle"><span style="display:none;">' . $text . "</span></div>\n";
+	if ($text != '') {
+		return '<div class="cactiTooltipHint fa fa-question-circle"><span style="display:none;">' . $text . "</span></div>\n";
+	} else {
+		return '';
+	}
 }
 
 /* get_page_list - generates the html necessary to present the user with a list of pages limited
@@ -891,6 +964,11 @@ function display_tooltip($text) {
    @arg $url - the url string to prepend to each page click
    @returns - a string containing html that represents the a page list */
 function get_page_list($current_page, $pages_per_screen, $rows_per_page, $total_rows, $url, $page_var = 'page', $return_to = '') {
+
+	// By current design, $pages_per_screen means number of page no in mid of nav bar
+	// when $total_pages is larger than $pages_per_screen + 2(first and last)
+	// So actual $pages_per_screen should be $pages_per_screen+2
+	$pages_per_screen += 2;
 	$url_page_select = "<ul class='pagination'>";
 
 	if (strpos($url, '?') !== false) {
@@ -898,6 +976,8 @@ function get_page_list($current_page, $pages_per_screen, $rows_per_page, $total_
 	} else {
 		$url . '?';
 	}
+
+	$url_ellipsis = '<li><span>...</span></li>';
 
 	$total_pages = ceil($total_rows / $rows_per_page);
 
@@ -910,27 +990,44 @@ function get_page_list($current_page, $pages_per_screen, $rows_per_page, $total_
 	$start_page = max(1, ($current_page - floor(($pages_per_screen - 1) / 2)));
 	$end_page = min($total_pages, ($current_page + floor(($pages_per_screen - 1) / 2)));
 
-	/* adjust if we are close to the beginning of the page list */
-	if ($current_page > ceil($pages_per_screen/2)) {
-		$url_page_select .= "<li><a href='#' onClick='goto$page_var(1);return false'>1</a></li>";
-		$url_page_select .= '<li><span>...</span></li>';
-	}
-	if ($current_page <= ceil(($pages_per_screen) / 2)) {
-		$end_page += ($pages_per_screen - $end_page);
+	if ($total_pages <= $pages_per_screen) {
+		$start_page = 2;
+		$end_page = $total_pages - 1;
+	} else {
+		$start_page = max(2, ($current_page - floor(($pages_per_screen - 3) / 2)));
+		/*When current_page > (pages_per_screen - 1) / 2*/
+		$end_page = min($total_pages - 1, ($current_page + floor(($pages_per_screen - 3) / 2)));
+
+		/* adjust if we are close to the beginning of the page list */
+		if ($current_page <= ceil(($pages_per_screen) / 2)) {
+			$end_page += ($pages_per_screen - $end_page - 1);
+		}
+
+		/* adjust if we are close to the end of the page list */
+		if (($total_pages - $current_page) < ceil(($pages_per_screen) / 2)) {
+			$start_page -= (($pages_per_screen - ($end_page - $start_page)) - 3);
+		}
+
+		/* stay within limits */
+		$start_page = max(2, $start_page);
+		$end_page = min($total_pages - 1, $end_page);
 	}
 
-	/* adjust if we are close to the end of the page list */
-	if (($total_pages - $current_page) < ceil(($pages_per_screen) / 2)) {
-		$start_page -= (($pages_per_screen - ($end_page - $start_page)) - 1);
+	if ($total_pages > 0) {
+		if ($current_page == 1) {
+			$url_page_select .= "<li><a href='#' class='active' onClick='goto$page_var(1);return false'>1</a></li>";
+		} else {
+			$url_page_select .= "<li><a href='#' onClick='goto$page_var(1);return false'>1</a></li>";
+		}
 	}
-
-	/* stay within limits */
-	$start_page = max(1, $start_page);
-	$end_page = min($total_pages, $end_page);
 
 	for ($page_number=0; (($page_number+$start_page) <= $end_page); $page_number++) {
 		$page = $page_number + $start_page;
 		if ($page_number < $pages_per_screen) {
+			if ($page_number == 0 && $start_page > 2) {
+				$url_page_select .= $url_ellipsis;
+			}
+
 			if ($current_page == $page) {
 				$url_page_select .= "<li><a href='#' class='active' onClick='goto$page_var($page);return false'>$page</a></li>";
 			} else {
@@ -939,19 +1036,25 @@ function get_page_list($current_page, $pages_per_screen, $rows_per_page, $total_
 		}
 	}
 
-	if (($total_pages - $current_page) >= ceil(($pages_per_screen) / 2)) {
-		$url_page_select .= '<li><span>...</span></li>';
-		$url_page_select .= "<li><a href='#' onClick='goto$page_var($total_pages);return false'>$total_pages</a></li>";
+	if ($total_pages - 1 > $end_page) {
+		$url_page_select .= $url_ellipsis;
+	}
+
+	if ($total_pages > 1) {
+		if ($current_page == $total_pages) {
+			$url_page_select .= "<li><a href='#' class='active' onClick='goto$page_var($total_pages);return false'>$total_pages</a></li>";
+		} else {
+			$url_page_select .= "<li><a href='#' onClick='goto$page_var($total_pages);return false'>$total_pages</a></li>";
+		}
 	}
 
 	$url_page_select .= '</ul>';
 
 	if ($return_to != '') {
-		$url_page_select .= "<script type='text/javascript'>function goto$page_var(pageNo) { if (typeof url_graph === 'function') { var url_add=url_graph('') } else { var url_add=''; }; $.get('${url}header=false&$page_var='+pageNo+url_add,function(data) { $('#$return_to').html(data); applySkin(); if (typeof initializeGraphs == 'function') initializeGraphs();}); }</script>";
+		$url_page_select .= "<script type='text/javascript'>function goto$page_var(pageNo) { if (typeof url_graph === 'function') { var url_add=url_graph('') } else { var url_add=''; }; $.get('" . sanitize_uri($url) . "header=false&" . $page_var . "='+pageNo+url_add).done(function(data) { $('#$return_to').html(data); applySkin(); }); }</script>";
 	} else {
 		$url_page_select .= "<script type='text/javascript'>function goto${page_var}(pageNo) { if (typeof url_graph === 'function') { var url_add=url_graph('') } else { var url_add=''; }; document.location='$url$page_var='+pageNo+url_add }</script>";
 	}
 
 	return $url_page_select;
 }
-

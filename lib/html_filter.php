@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -61,8 +61,7 @@ class CactiTableFilter {
 				'row1' => array(
 					'filter' => array(
 						'friendly_name'  => __('Search'),
-						'filter'         => FILTER_CALLBACK,
-						'filter_options' => array('options' => 'sanitize_search_string'),
+						'filter'         => FILTER_DEFAULT,
 						'placeholder'    => __('Enter a search term'),
 						'size'           => '30',
 						'default'        => '',
@@ -111,7 +110,7 @@ class CactiTableFilter {
 	public function get_filter_row($index) {
 		if ($index === false ) {
 			return false;
-		} elseif (array_key_exists($this->filter_array['rows'][$index])) {
+		} elseif (array_key_exists($index, $this->filter_array['rows'])) {
 			return $this->filter_array['rows'][$index];
 		} else {
 			return false;
@@ -147,7 +146,7 @@ class CactiTableFilter {
 	}
 
 	private function create_filter() {
-		if (!sizeof($this->filter_array)) {
+		if (!cacti_sizeof($this->filter_array)) {
 			$this->filter_array = $this->default_filter;
 		}
 
@@ -164,13 +163,13 @@ class CactiTableFilter {
 					switch($field_array['method']) {
 					case 'button':
 						print "<div class='formColumnButton'>\n";
-						print "<input type='button' id='" . $field_name . "' value='" . htmlspecialchars(get_request_var($field_name), ENT_QUOTES, 'UTF-8') . "'" . (isset($field_array->title) ? " title='" . htmlspecialchars($field_array->title, ENT_QUOTES, 'UTF-8'):'') . "'>";
+						print "<input type='button' class='ui-button ui-corner-all ui-widget' id='" . $field_name . "' value='" . html_escape_request_var($field_name) . "'" . (isset($field_array->title) ? " title='" . html_escape($field_array->title, ENT_QUOTES, 'UTF-8'):'') . "'>";
 						print "</div>\n";
 
 						break;
 					case 'submit':
 						print "<div class='formColumnButton'>\n";
-						print "<input type='submit' id='" . $field_name . "' value='" . htmlspecialchars(get_request_var($field_name), ENT_QUOTES, 'UTF-8') . "'" . (isset($field_array->title) ? " title='" . htmlspecialchars($field_array->title, ENT_QUOTES, 'UTF-8'):'') . "'>";
+						print "<input type='submit' class='ui-button ui-corner-all ui-widget' id='" . $field_name . "' value='" . html_escape_request_var($field_name) . "'" . (isset($field_array->title) ? " title='" . html_escape($field_array->title):'') . "'>";
 						print "</div>\n";
 
 						break;
@@ -252,7 +251,7 @@ class CactiTableFilter {
 		<script type='text/javascript'>
 
 		function applyFilter() {
-			strURL = <?php print $strURL;?>
+			strURL = <?php print $applyFilter;?>
 			loadPageNoHeader(strURL);
 		}
 
@@ -274,6 +273,7 @@ class CactiTableFilter {
 				clearFilter();
 			})
 		});
+		</script>
 
 		<?php
 	}

@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -22,12 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-/* do NOT run this script through a web browser */
-if (!isset($_SERVER['argv'][0]) || isset($_SERVER['REQUEST_METHOD'])  || isset($_SERVER['REMOTE_ADDR'])) {
-	die('<br><strong>This script is only meant to run at the command line.</strong>');
-}
-
-$no_http_headers = true;
+require(__DIR__ . '/include/cli_check.php');
 
 declare(ticks = 1);
 
@@ -41,13 +36,13 @@ function sig_handler($signo) {
 		case SIGABRT:
 		case SIGQUIT:
 		case SIGSEGV:
-			cacti_log("WARNING: Script Server terminated with signal '$signo' in file:'" . basename($include_file) . "', function:'$function', params:'$parameters'", FALSE, 'PHPSVR');
+			cacti_log("WARNING: Script Server terminated with signal '$signo' in file:'" . basename($include_file) . "', function:'$function', params:'$parameters'", false, 'PHPSVR', POLLER_VERBOSITY_MEDIUM);
 			db_close();
 
 			exit;
 			break;
 		default:
-			cacti_log("WARNING: Script Server received signal '$signo' in file:'$include_file', function:'$function', params:'$parameters'", FALSE, 'PHPSVR');
+			cacti_log("WARNING: Script Server received signal '$signo' in file:'$include_file', function:'$function', params:'$parameters'", false, 'PHPSVR', POLLER_VERBOSITY_HIGH);
 
 			break;
 	}
@@ -55,6 +50,11 @@ function sig_handler($signo) {
 
 /* used for includes */
 /* install signal handlers for UNIX only */
+$parent_pid = '';
+if (function_exists('posix_getppid')) {
+	$parent_pid = posix_getppid();
+}
+
 if (function_exists('pcntl_signal')) {
 	pcntl_signal(SIGTERM, 'sig_handler');
 	pcntl_signal(SIGINT, 'sig_handler');
@@ -64,7 +64,6 @@ if (function_exists('pcntl_signal')) {
 }
 
 error_reporting(0);
-include_once(dirname(__FILE__) . '/include/global.php');
 
 /* define STDOUT/STDIN file descriptors if not running under CLI */
 if (php_sapi_name() != 'cli') {
@@ -103,7 +102,7 @@ if ($_SERVER['argc'] >= 2) {
 	else
 		if (($_SERVER['argv'][1] == 'cmd.php') || ($_SERVER['argv'][1] == 'cmd'))
 			$environ = 'cmd';
-		elseif ($_SERVER['argv'][1] == 'realtime') 
+		elseif ($_SERVER['argv'][1] == 'realtime')
 			$environ = 'realtime';
 		else
 			$environ = 'other';
@@ -117,7 +116,7 @@ if ($_SERVER['argc'] >= 2) {
 	$poller_id = 1;
 }
 
-cacti_log('DEBUG: SERVER: ' . $environ, false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
+cacti_log('DEBUG: SERVER: ' . $environ . ' PARENT: ' . $parent_pid, false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
 
 if ($config['cacti_server_os'] == 'win32') {
 	cacti_log('DEBUG: GETCWD: ' . strtolower(strtr(getcwd(),"\\",'/')), false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
@@ -135,6 +134,9 @@ cacti_log('PHP Script Server has Started - Parent is ' . $environ, false, 'PHPSV
 fputs(STDOUT, 'PHP Script Server has Started - Parent is ' . $environ . "\n");
 fflush(STDOUT);
 
+$log_file = '/usr/share/cacti/site/log/script_server_' . getmypid() . '.out';
+$log_keep = false;
+
 /* process waits for input and then calls functions as required */
 while (1) {
 	$result = '';
@@ -144,13 +146,43 @@ while (1) {
 	$parameters      = '';
 	$parameter_array = array();
 
-	if ($input_string !== FALSE) {
+	$isParentRunning = true;
+	if (empty($input_string)) {
+		if (!empty($parent_pid)) {
+			if(strncasecmp(PHP_OS, "win", 3) == 0) {
+				$out = [];
+				exec("TASKLIST /FO LIST /FI \"PID eq $parent_pid\"", $out);
+
+				$isParentRunning = (count($out) > 1);
+			} elseif (function_exists('posix_kill')) {
+				$isParentRunning = posix_kill(intval($parent_pid), 0);
+			}
+		}
+
+		if ($isParentRunning) {
+			if (!empty($parent_pid)) {
+				cacti_log('WARNING: Input Expected, parent process ' . $parent_pid . ' should have sent non-blank line', false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
+			} else {
+				cacti_log('WARNING: Input Expected, unable to check parent process', false, 'PHPSVR', POLLER_VERBOSITY_MEDIUM);
+			}
+		} else {
+			cacti_log('WARNING: Parent (' . $parent_pid . ') of Script Server (' . getmypid() . ') has been lost, forcing exit', false, 'PHPSVR', POLLER_VERBOSITY_HIGH);
+			$input_string = 'quit';
+		}
+
+		$log_keep = true;
+	}
+
+	if (!empty($input_string)) {
 		$input_string = trim($input_string);
 
 		if (substr($input_string,0,4) == 'quit') {
-			fputs(STDOUT, 'PHP Script Server Shutdown request received, exiting\n');
+			fputs(STDOUT, 'PHP Script Server Shutdown request received, exiting' . PHP_EOL);
 			fflush(STDOUT);
 			cacti_log('DEBUG: PHP Script Server Shutdown request received, exiting', false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
+			if (!$log_keep && file_exists($log_file)) {
+				unlink($log_file);
+			}
 			db_close();
 			exit(0);
 		}
@@ -170,7 +202,7 @@ while (1) {
 						break;
 					case 1:
 						/* cut off function as second part of input string and keep rest for further parsing */
-						$function = trim(substr($input_string,0,$pos));
+						$function = trim(substr($input_string,0,$pos), "' ");
 						$input_string = trim(strchr($input_string, ' ')) . ' ';
 						break;
 					case 2:
@@ -192,7 +224,9 @@ while (1) {
 				continue;
 			}
 
-			cacti_log("DEBUG: PID[$pid] CTR[$ctr] INC: '". basename($include_file) . "' FUNC: '" .$function . "' PARMS: '" . $parameters . "'", false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
+			cacti_log("DEBUG: PID[$pid] CTR[$ctr] INC: '". basename($include_file) .
+			        "' FUNC: '$function' PARMS: '" . implode('\', \'',$parameter_array) .
+			        "'", false, 'PHPSVR', POLLER_VERBOSITY_DEBUG);
 
 			/* validate the existance of the function, and include if applicable */
 			if (!function_exists($function)) {
@@ -235,11 +269,6 @@ while (1) {
 				fflush(STDOUT);
 			}
 		}
-	} else {
-		cacti_log('ERROR: Input Expected, Script Server Terminating', false, 'PHPSVR');
-		fputs(STDOUT, "ERROR: Input Expected, Script Server Terminating\n");
-		fflush(STDOUT);
-		exit (-1);
 	}
 
 	/* end the process if the runtime exceeds MAX_POLLER_RUNTIME */

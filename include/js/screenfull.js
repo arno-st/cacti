@@ -1,12 +1,12 @@
 /*!
 * screenfull
-* v3.2.0 - 2017-04-16
+* v3.3.3 - 2018-09-04
 * (c) Sindre Sorhus; MIT License
 */
 (function () {
 	'use strict';
 
-	var document = typeof window === 'undefined' ? {} : window.document;
+	var document = typeof window !== 'undefined' && typeof window.document !== 'undefined' ? window.document : {};
 	var isCommonjs = typeof module !== 'undefined' && module.exports;
 	var keyboardAllowed = typeof Element !== 'undefined' && 'ALLOW_KEYBOARD_INPUT' in Element;
 
@@ -77,6 +77,11 @@
 		return false;
 	})();
 
+	var eventNameMap = {
+		change: fn.fullscreenchange,
+		error: fn.fullscreenerror
+	};
+
 	var screenfull = {
 		request: function (elem) {
 			var request = fn.requestFullscreen;
@@ -87,10 +92,10 @@
 			// keyboard in fullscreen even though it doesn't.
 			// Browser sniffing, since the alternative with
 			// setTimeout is even worse.
-			if (/5\.1[.\d]* Safari/.test(navigator.userAgent)) {
+			if (/ Version\/5\.1(?:\.\d+)? Safari\//.test(navigator.userAgent)) {
 				elem[request]();
 			} else {
-				elem[request](keyboardAllowed && Element.ALLOW_KEYBOARD_INPUT);
+				elem[request](keyboardAllowed ? Element.ALLOW_KEYBOARD_INPUT : {});
 			}
 		},
 		exit: function () {
@@ -104,10 +109,22 @@
 			}
 		},
 		onchange: function (callback) {
-			document.addEventListener(fn.fullscreenchange, callback, false);
+			this.on('change', callback);
 		},
 		onerror: function (callback) {
-			document.addEventListener(fn.fullscreenerror, callback, false);
+			this.on('error', callback);
+		},
+		on: function (event, callback) {
+			var eventName = eventNameMap[event];
+			if (eventName) {
+				document.addEventListener(eventName, callback, false);
+			}
+		},
+		off: function (event, callback) {
+			var eventName = eventNameMap[event];
+			if (eventName) {
+				document.removeEventListener(eventName, callback, false);
+			}
 		},
 		raw: fn
 	};

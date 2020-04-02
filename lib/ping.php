@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -166,7 +166,11 @@ class Net_Ping
 			} elseif (substr_count(strtolower(PHP_OS), 'mac')) {
 				$result = shell_exec('ping -t ' . ceil($this->timeout/1000) . ' -c ' . $this->retries . ' ' . $this->host['hostname']);
 			} elseif (substr_count(strtolower(PHP_OS), 'freebsd')) {
-				$result = shell_exec('ping -t ' . ceil($this->timeout/1000) . ' -c ' . $this->retries . ' ' . $this->host['hostname']);
+				if (strpos($this->host['hostname'], ':') !== false) {
+					$result = shell_exec('ping6 -X ' . ceil($this->timeout/1000) . ' -c ' . $this->retries . ' ' . $this->host['hostname']);
+				} else {
+					$result = shell_exec('ping -t ' . ceil($this->timeout/1000) . ' -c ' . $this->retries . ' ' . $this->host['hostname']);
+				}
 			} elseif (substr_count(strtolower(PHP_OS), 'darwin')) {
 				$result = shell_exec('ping -t ' . ceil($this->timeout/1000) . ' -c ' . $this->retries . ' ' . $this->host['hostname']);
 			} elseif (substr_count(strtolower(PHP_OS), 'bsd')) {
@@ -649,7 +653,7 @@ class Net_Ping
 			$this->snmp_status = 0.000;
 		} elseif (($avail_method == AVAIL_SNMP_AND_PING) && ($ping_result == false)) {
 			$snmp_result = false;
-		} elseif (($avail_method == AVAIL_SNMP) || ($avail_method == AVAIL_SNMP_AND_PING) || ($avail_method == AVAIL_SNMP_GET_SYSDESC) || ($avail_method == AVAIL_SNMP_GET_NEXT)) {
+		} elseif (($avail_method == AVAIL_SNMP) || ($avail_method == AVAIL_SNMP_AND_PING) || ($avail_method == AVAIL_SNMP_OR_PING) || ($avail_method == AVAIL_SNMP_GET_SYSDESC) || ($avail_method == AVAIL_SNMP_GET_NEXT)) {
 			if (($this->host['snmp_community'] == '') && ($this->host['snmp_version'] != 3)) {
 				/* snmp version 1/2 without community string assume SNMP test to be successful
 				   due to backward compatibility issues */

@@ -2,7 +2,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -14,7 +14,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,16 +23,9 @@
  +-------------------------------------------------------------------------+
 */
 
-/* do NOT run this script through a web browser */
-if (!isset($_SERVER['argv'][0]) || isset($_SERVER['REQUEST_METHOD'])  || isset($_SERVER['REMOTE_ADDR'])) {
-	die('<br>This script is only meant to run at the command line.');
-}
-
-/* We are not talking to the browser */
-$no_http_headers = true;
+require(__DIR__ . '/include/cli_check.php');
 
 /* include important functions */
-include_once('./include/global.php');
 include_once($config['base_path'] . '/lib/poller.php');
 include_once($config['base_path'] . '/lib/boost.php');
 
@@ -68,8 +61,8 @@ if (trim($result) == '') {
 	}
 	$result_array = explode("\n", $result);
 
-	if (sizeof($result_array)) {
-		$result = $result_array[sizeof($result_array)-2];
+	if (cacti_sizeof($result_array)) {
+		$result = $result_array[cacti_sizeof($result_array)-2];
 	} else {
 		$result = 'ERROR: Detected unknown error';
 	}

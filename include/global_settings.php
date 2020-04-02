@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -26,7 +26,7 @@ $dir = dir($config['base_path'] . '/include/themes/');
 while (false !== ($entry = $dir->read())) {
 	if ($entry != '.' && $entry != '..') {
 		if (is_dir($config['base_path'] . '/include/themes/' . $entry)) {
-			$themes[$entry] = ucwords($entry);
+			$themes[$entry] = __(ucwords($entry));
 		}
 	}
 }
@@ -35,24 +35,23 @@ $dir->close();
 
 /* tab information */
 $tabs = array(
-	'general' => __('General'),
-	'path' => __('Paths'),
-	'snmp' => __('Device Defaults'),
-	'poller' => __('Poller'),
-	'storage' => __('Data Storage'),
-	'visual' => __('Visual'),
+	'general'        => __('General'),
+	'path'           => __('Paths'),
+	'snmp'           => __('Device Defaults'),
+	'poller'         => __('Poller'),
+	'data'           => __('Data'),
+	'visual'         => __('Visual'),
 	'authentication' => __('Authentication'),
-	'dsstats' => __('Data Source Statistics'),
-	'boost' => __('Performance'),
-	'spikes' => __('Spikes'),
-	'mail' => __('Mail/Reporting/DNS'));
+	'boost'          => __('Performance'),
+	'spikes'         => __('Spikes'),
+	'mail'           => __('Mail/Reporting/DNS'));
 
 $tabs_graphs = array(
-	'general' => __('General Settings'),
-	'timespan' => __('Time Spanning/Shifting'),
+	'general'   => __('General Settings'),
+	'timespan'  => __('Time Spanning/Shifting'),
 	'thumbnail' => __('Graph Thumbnail Settings'),
-	'tree' => __('Tree Settings'),
-	'fonts' => __('Graph Fonts'));
+	'tree'      => __('Tree Settings'),
+	'fonts'     => __('Graph Fonts'));
 
 $spikekill_templates = array_rekey(db_fetch_assoc('SELECT DISTINCT gt.id, gt.name
 	FROM graph_templates AS gt
@@ -73,11 +72,52 @@ if (db_table_exists('plugin_config')) {
 
 /* get the files for selective logging */
 $realm_files  = array_keys($user_auth_realm_filenames);
-$nohead_files = array_values($no_http_header_files);
 foreach($realm_files as $file) {
 	$logfiles[$file] = $file;
 }
 
+/* we need this list of files for selective debug */
+$no_http_header_files = array(
+	'add_device.php',
+	'add_graphs.php',
+	'add_perms.php',
+	'add_tree.php',
+	'boost_rrdupdate.php',
+	'cmd.php',
+	'cmd_realtime.php',
+	'copy_user.php',
+	'host_update_template.php',
+	'poller_automation.php',
+	'poller_boost.php',
+	'poller_commands.php',
+	'poller_dsstats.php',
+	'poller_export.php',
+	'poller_graphs_reapply_names.php',
+	'poller_maintenance.php',
+	'poller_output_empty.php',
+	'poller.php',
+	'poller_realtime.php',
+	'poller_recovery.php',
+	'poller_reindex_hosts.php',
+	'poller_reports.php',
+	'poller_spikekill.php',
+	'query_host_cpu.php',
+	'query_host_partitions.php',
+	'rebuild_poller_cache.php',
+	'remote_agent.php',
+	'repair_database.php',
+	'script_server.php',
+	'snmpagent_mibcachechild.php',
+	'snmpagent_mibcache.php',
+	'snmpagent_persist.php',
+	'sql.php',
+	'ss_host_cpu.php',
+	'ss_host_disk.php',
+	'ss_sql.php',
+	'structure_rra_paths.php',
+);
+
+$nohead_files = array_values($no_http_header_files);
 foreach($nohead_files as $file) {
 	$logfiles[$file] = $file;
 }
@@ -86,6 +126,16 @@ $logfiles['poller_realtime.php'] = 'poller_realtime.php';
 $logfiles['cmd_realtime.php']    = 'cmd_realtime.php';
 
 asort($logfiles);
+
+$mail_methods = array(
+	CACTI_MAIL_PHP      => __('PHP Mail() Function'),
+	CACTI_MAIL_SENDMAIL => __('Sendmail'),
+	CACTI_MAIL_SMTP     => __('SMTP')
+);
+
+if ($config['cacti_server_os'] == 'win32') {
+	unset($mail_methods[CACTI_MAIL_SENDMAIL]);
+}
 
 /* setting information */
 $settings = array(
@@ -99,42 +149,49 @@ $settings = array(
 			'friendly_name' => __('snmpwalk Binary Path'),
 			'description' => __('The path to your snmpwalk binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_snmpget' => array(
 			'friendly_name' => __('snmpget Binary Path'),
 			'description' => __('The path to your snmpget binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_snmpbulkwalk' => array(
 			'friendly_name' => __('snmpbulkwalk Binary Path'),
 			'description' => __('The path to your snmpbulkwalk binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_snmpgetnext' => array(
 			'friendly_name' => __('snmpgetnext Binary Path'),
 			'description' => __('The path to your snmpgetnext binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_snmptrap' => array(
 			'friendly_name' => __('snmptrap Binary Path'),
 			'description' => __('The path to your snmptrap binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_rrdtool' => array(
 			'friendly_name' => __('RRDtool Binary Path'),
 			'description' => __('The path to the rrdtool binary.'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'path_php_binary' => array(
 			'friendly_name' => __('PHP Binary Path'),
 			'description' => __('The path to your PHP binary file (may require a php recompile to get this file).'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => '255'
 			),
 		'logging_header' => array(
@@ -144,16 +201,29 @@ $settings = array(
 			),
 		'path_cactilog' => array(
 			'friendly_name' => __('Cacti Log Path'),
-			'description' => __('The path to your Cacti log file (if blank, defaults to <path_cacti>/log/cacti.log)'),
+			'description' => __('The path to your Cacti log file (if blank, defaults to &lt;path_cacti&gt;/log/cacti.log)'),
 			'method' => 'filepath',
+			'file_type' => 'ascii',
 			'default' => $config['base_path'] . '/log/cacti.log',
-			'max_length' => '255'
+			'max_length' => '255',
+			'install_check' => 'writable',
+			'install_blank' => true
+			),
+		'path_stderrlog' => array(
+			'friendly_name' => __('Poller Standard Error Log Path'),
+			'description' => __('If you are having issues with Cacti\'s Data Collectors, set this file path and the Data Collectors standard error will be redirected to this file'),
+			'method' => 'filepath',
+			'file_type' => 'ascii',
+			'default' => $config['base_path'] . '/log/cacti_stderr.log',
+			'max_length' => '255',
+			'install_check' => 'writable',
+			'install_optional' => true
 			),
 		'logrotate_enabled' => array(
 			'friendly_name' => __('Rotate the Cacti Log'),
 			'description' => __('This option will rotate the Cacti Log periodically.'),
 			'method' => 'checkbox',
-			'default' => '',
+			'default' => 'on',
 			),
 		'logrotate_frequency' => array(
 			'friendly_name' => __('Rotation Frequency'),
@@ -179,13 +249,17 @@ $settings = array(
 			'friendly_name' => __('Spine Binary File Location'),
 			'description' => __('The path to Spine binary.'),
 			'method' => 'filepath',
-			'max_length' => '255'
+			'file_type' => 'binary',
+			'max_length' => '255',
+			'install_optional' => true,
 			),
 		'path_spine_config' => array(
 			'friendly_name' => __('Spine Config File Path'),
-			'description' => __('The path to Spine configuration file.  By default, in the cwd of spine, or /etc if not specified.'),
+			'description' => __('The path to Spine configuration file.  By default, in the cwd of Spine, or /etc if not specified.'),
 			'method' => 'filepath',
-			'max_length' => '255'
+			'file_type' => 'ascii',
+			'max_length' => '255',
+			'install_optional' => true,
 			),
 		'rrdclean_header' => array(
 			'friendly_name' => __('RRD Cleaner'),
@@ -194,28 +268,30 @@ $settings = array(
 			),
 		'rrd_autoclean' => array(
 			'friendly_name' => __('RRDfile Auto Clean'),
-			'description' => __('Automatically Delete, Archive, or Delete RRDfiles when removed from Cacti'),
+			'description' => __('Automatically archive or delete RRDfiles when their corresponding Data Sources are removed from Cacti'),
 			'method' => 'checkbox',
 			'default' => ''
  			),
 		'rrd_autoclean_method' => array(
 			'friendly_name' => __('RRDfile Auto Clean Method'),
-			'description' => __('The method used to Clean RRDfiles from Cacti after their deletion.'),
+			'description' => __('The method used to Clean RRDfiles from Cacti after their Data Sources are deleted.'),
 			'method' => 'drop_array',
-			'array' => array('1' => 'Delete', '3' => 'Archive'),
+			'array' => array(
+				'1' => __('Delete'),
+				'3' => __('Archive')),
 			'default' => '1'
  			),
 		'rrd_archive' => array(
 			'friendly_name' => __('Archive directory'),
-			'description' => __('This is the directory where RRDfiles are <strong>moved</strong> for <strong>Archive</strong>'),
+			'description' => __('This is the directory where RRDfiles are <strong>moved</strong> for archiving'),
 			'method' => 'dirpath',
 			'default' => $config['base_path'] . '/rra/archive/',
 			'max_length' => 255,
 			),
 		),
 	'general' => array(
-		'event_logging_header' => array(
-			'friendly_name' => __('Event Logging'),
+		'poller_specific_header' => array(
+			'friendly_name' => __('Log Settings'),
 			'collapsible' => 'true',
 			'method' => 'spacer',
 			),
@@ -226,37 +302,24 @@ $settings = array(
 			'default' => 1,
 			'array' => $logfile_options,
 			),
-		'web_log' => array(
-			'friendly_name' => __('Web Events'),
-			'description' => __('What Cacti website messages should be placed in the log.'),
-			'method' => 'checkbox_group',
-			'tab' => 'general',
-			'items' => array(
-				'log_snmp' => array(
-					'friendly_name' => __('SNMP Messages'),
-					'default' => ''
-					),
-				'log_graph' => array(
-					'friendly_name' => __('Graph Syntax'),
-					'default' => ''
-					),
-				'developer_mode' => array(
-					'friendly_name' => __('Developer Mode'),
-					'default' => ''
-					)
-				),
-			),
-		'poller_specific_header' => array(
-			'friendly_name' => __('Log Settings'),
-			'collapsible' => 'true',
-			'method' => 'spacer',
-			),
 		'log_verbosity' => array(
 			'friendly_name' => __('Generic Log Level'),
 			'description' => __('What level of detail do you want sent to the log file.  WARNING: Leaving in any other status than NONE or LOW can exhaust your disk space rapidly.'),
 			'method' => 'drop_array',
 			'default' => POLLER_VERBOSITY_LOW,
 			'array' => $logfile_verbosity,
+			),
+		'log_validation' => array(
+			'friendly_name' => __('Log Input Validation Issues'),
+			'description' => __('Record when request fields are accessed without going through proper input validation'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
+		'data_source_trace' => array(
+			'friendly_name' => __('Data Source Tracing'),
+			'description' => __('A developer only option to trace the creation of Data Sources mainly around checks for uniqueness'),
+			'method' => 'checkbox',
+			'default' => ''
 			),
 		'selective_debug' => array(
 			'friendly_name' => __('Selective File Debug'),
@@ -281,8 +344,8 @@ $settings = array(
 			'default' => ''
 			),
 		'poller_log' => array(
-			'friendly_name' => __('Poller Syslog/Eventlog Selection'),
-			'description' => __('If you are using the Syslog/Eventlog, What Cacti poller messages should be placed in the Syslog/Eventlog.'),
+			'friendly_name' => __('Syslog/Eventlog Item Selection'),
+			'description' => __('When using Syslog/Eventlog for logging, the Cacti log messages that will be forwarded to the Syslog/Eventlog.'),
 			'method' => 'checkbox_group',
 			'tab' => 'poller',
 			'items' => array(
@@ -341,19 +404,21 @@ $settings = array(
             'default' => '1',
             'array' => $i18n_modes
             ),
-        'i18n_default_language' => array(
-            'friendly_name' => __('Language'),
+		'i18n_default_language' => array(
+			'friendly_name' => __('Language'),
             'description' => __('Default language for this system.'),
-            'method' => 'drop_array',
-            'default' => 'en',
-            'array' => get_installed_locales()
-            ),
+			'method' => 'drop_language',
+			'default' => 'en-US',
+			'array' => get_installed_locales()
+		),
         'i18n_auto_detection' => array(
             'friendly_name' => __('Auto Language Detection'),
             'description' => __('Allow to automatically determine the \'default\' language of the user and provide it at login time if that language is supported by Cacti. If disabled, the default language will be in force until the user elects another language.'),
             'method' => 'drop_array',
             'default' => '1',
-            'array' => array( '0' => __('Disabled'), '1' => __('Enabled'))
+            'array' => array(
+				'0' => __('Disabled'),
+				'1' => __('Enabled'))
             ),
 		'default_date_format' => array(
 			'friendly_name' => __('Date Display Format'),
@@ -378,7 +443,7 @@ $settings = array(
 			'friendly_name' => __('RRDtool Version'),
 			'description' => __('The version of RRDtool that you have installed.'),
 			'method' => 'drop_array',
-			'default' => 'rrd-1.4.x',
+			'default' => '1.4.0',
 			'array' => $rrdtool_versions,
 			),
 		'graph_auth_method' => array(
@@ -386,19 +451,23 @@ $settings = array(
 			'description' => __('There are two methods for determining a User\'s Graph Permissions.  The first is \'Permissive\'.  Under the \'Permissive\' setting, a User only needs access to either the Graph, Device or Graph Template to gain access to the Graphs that apply to them.  Under \'Restrictive\', the User must have access to the Graph, the Device, and the Graph Template to gain access to the Graph.'),
 			'method' => 'drop_array',
 			'default' => '1',
-			'array' => array('1' => __('Permissive'), '2' => __('Restrictive'))
+			'array' => array(
+				'1' => __('Permissive'),
+				'2' => __('Restrictive'))
 			),
 		'grds_creation_method' => array(
 			'method' => 'drop_array',
 			'friendly_name' => __('Graph/Data Source Creation Method'),
 			'description' => __('If set to Simple, Graphs and Data Sources can only be created from New Graphs.  If Advanced, legacy Graph and Data Source creation is supported.'),
 			'default' => '0',
-			'array' => array('0' => __('Simple'), '1' => __('Advanced'))
+			'array' => array(
+				'0' => __('Simple'),
+				'1' => __('Advanced'))
 			),
 		'hide_form_description' => array(
 			'friendly_name' => __('Show Form/Setting Help Inline'),
 			'description' => __('When checked, Form and Setting Help will be show inline.  Otherwise it will be presented when hovering over the help button.'),
-			'default' => 'on',
+			'default' => '',
 			'method' => 'checkbox',
 			),
 		'deletion_verification' => array(
@@ -407,24 +476,44 @@ $settings = array(
 			'default' => 'on',
 			'method' => 'checkbox',
 			),
+                'ds_preselected_delete' => array(
+                        'friendly_name' => __('Data Source Preservation Preset'),
+                        'description' => __('When enabled, Cacti will set Radio Button to Delete related Data Sources of a Graph when removing Graphs.  Note: Cacti will not allow the removal of Data Sources if they are used in other Graphs.'),
+                        'method' => 'checkbox',
+                        'default' => 'on'
+                        ),
+                'graphs_auto_unlock' => array(
+                        'friendly_name' => __('Graphs Auto Unlock'),
+                        'description' => __('When enabled, Cacti will not lock Graphs.  This allow a faster manual modification of Data Sources related to a Graph.'),
+                        'method' => 'checkbox',
+                        'default' => ''
+                        ),
 		'hide_console' => array(
-			'friendly_name' => __('Hide Cacti Console'),
-			'description' => __('For use with Cacti\'s External Link Support.  Using this setting, you can replace the Cacti Console with your own page.'),
-			'method' => 'drop_array',
-			'default' => 0,
-			'array' => array(0 => __('No'), 1 => __('Yes'))
-		),
+			'friendly_name' => __('Hide Cacti Dashboard'),
+			'description' => __('For use with Cacti\'s External Link Support.  Using this setting, you can hide the Cacti Dashboard, so you can display just your own page.'),
+			'default' => '',
+			'method' => 'checkbox'
+			),
 		'drag_and_drop' => array(
 			'friendly_name' => __('Enable Drag-N-Drop'),
 			'description' => __('Some of Cacti\'s interfaces support Drag-N-Drop.  If checked this option will be enabled.  Note: For visually impaired user, this option may be disabled.'),
 			'method' => 'checkbox',
 			'default' => 'on',
-		),
+			),
 		'force_https' => array(
 			'friendly_name' => __('Force Connections over HTTPS'),
 			'description' => __('When checked, any attempts to access Cacti will be redirected to HTTPS to ensure high security.'),
 			'default' => '',
 			'method' => 'checkbox',
+			),
+		'content_security_policy_script' => array(
+			'method' => 'drop_array',
+			'friendly_name' => __('Allow Unsafe JavaScript eval() calls'),
+			'description' => __('Certain Cacti plugins require the use of unsafe JavaScript eval() calls.  If you select this option, they will be allowed in Cacti.'),
+			'default' => '',
+			'array' => array(
+				'0'           => __('No'),
+				'unsafe-eval' => __('Yes'))
 			),
 		'automation_header' => array(
 			'friendly_name' => __('Automation'),
@@ -434,18 +523,36 @@ $settings = array(
 		'automation_graphs_enabled' => array(
 			'method' => 'checkbox',
 			'friendly_name' => __('Enable Automatic Graph Creation'),
-			'description' => __('When disabled, Cacti Automation will not actively create any Graph.' .
-				'This is useful when adjusting Host settings so as to avoid creating new Graphs each time you save an object. ' .
-				'Invoking Automation Rules manually will still be possible.'),
-			'default' => '',
+			'description' => __('When disabled, Cacti Automation will not actively create any Graph.  This is useful when adjusting Device settings so as to avoid creating new Graphs each time you save an object.  Invoking Automation Rules manually will still be possible.'),
+			'default' => 'on',
 			),
 		'automation_tree_enabled' => array(
 			'method' => 'checkbox',
 			'friendly_name' => __('Enable Automatic Tree Item Creation'),
-			'description' => __('When disabled, Cacti Automation will not actively create any Tree Item.' .
-				'This is useful when adjusting Host or Graph settings so as to avoid creating new Tree Entries each time you save an object. ' .
-				'Invoking Rules manually will still be possible.'),
+			'description' => __('When disabled, Cacti Automation will not actively create any Tree Item.  This is useful when adjusting Device or Graph settings so as to avoid creating new Tree Entries each time you save an object.  Invoking Rules manually will still be possible.'),
+			'default' => 'on',
+			),
+		'automation_email' => array(
+			'friendly_name' => __('Automation Notification To Email'),
+			'description' => __('The Email Address to send Automation Notification Emails to if not specified at the Automation Network level.  If either this field, or the Automation Network value are left blank, Cacti will use the Primary Cacti Admins Email account.'),
+			'method' => 'textbox',
 			'default' => '',
+			'max_length' => '128',
+			),
+		'automation_fromname' => array(
+			'friendly_name' => __('Automation Notification From Name'),
+			'description' => __('The Email Name to use for Automation Notification Emails to if not specified at the Automation Network level.  If either this field, or the Automation Network value are left blank, Cacti will use the system default From Name.'),
+			'method' => 'textbox',
+			'default' => '',
+			'max_length' => '32',
+			'size' => '30'
+			),
+		'automation_fromemail' => array(
+			'friendly_name' => __('Automation Notification From Email'),
+			'description' => __('The Email Address to use for Automation Notification Emails to if not specified at the Automation Network level.  If either this field, or the Automation Network value are left blank, Cacti will use the system default From Email Address.'),
+			'method' => 'textbox',
+			'default' => '',
+			'max_length' => '100',
 			),
 		),
 	'snmp' => array(
@@ -453,6 +560,14 @@ $settings = array(
 			'friendly_name' => __('General Defaults'),
 			'method' => 'spacer',
 			'collapsible' => 'true'
+			),
+		'default_template' => array(
+			'friendly_name' => __('Template'),
+			'description' => __('The default Device Template used on all new Devices.'),
+			'method' => 'drop_sql',
+			'default' => '1',
+			'none_value' => __('None'),
+			'sql' => 'SELECT id, name FROM host_template ORDER BY name',
 			),
 		'default_site' => array(
 			'friendly_name' => __('Site'),
@@ -472,7 +587,7 @@ $settings = array(
 			),
 		'device_threads' => array(
 			'friendly_name' => __('Device Threads'),
-			'description' => __('The default number of Device Threads.  This is only applicable when using the spine Data Collector.'),
+			'description' => __('The default number of Device Threads.  This is only applicable when using the Spine Data Collector.'),
 			'method' => 'drop_array',
 			'default' => '1',
 			'array' => array(1, 2, 3, 4, 5, 6)
@@ -484,79 +599,118 @@ $settings = array(
 			'default' => '1',
 			'array' => $reindex_types,
 			),
+		'default_interface_speed' => array(
+			'friendly_name' => __('Default Interface Speed'),
+			'description' => __('If Cacti can not determine the interface speed due to either ifSpeed or ifHighSpeed not being set or being zero, what maximum value do you wish on the resulting RRDfiles.'),
+			'method' => 'drop_array',
+			'default' => '1000',
+			'array' => array(
+				'100'    => __('100 Mbps Ethernet'),
+				'1000'   => __('1 Gbps Ethernet'),
+				'10000'  => __('10 Gbps Ethernet'),
+				'25000'  => __('25 Gbps Ethernet'),
+				'40000'  => __('40 Gbps Ethernet'),
+				'56000'  => __('56 Gbps Ethernet'),
+				'100000' => __('100 Gbps Ethernet'))
+			),
 		'snmp_header' => array(
 			'friendly_name' => __('SNMP Defaults'),
 			'method' => 'spacer',
 			'collapsible' => 'true'
 			),
-		'snmp_ver' => array(
+		'snmp_version' => array(
 			'friendly_name' => __('Version'),
-			'description' => __('Default SNMP version for all new hosts.'),
+			'description' => __('Default SNMP version for all new Devices.'),
 			'method' => 'drop_array',
 			'default' => '2',
 			'array' => $snmp_versions,
 			),
 		'snmp_community' => array(
 			'friendly_name' => __('Community'),
-			'description' => __('Default SNMP read community for all new hosts.'),
+			'description' => __('Default SNMP read community for all new Devices.'),
 			'method' => 'textbox',
 			'default' => 'public',
 			'max_length' => '100',
 			),
-		'snmp_username' => array(
-			'friendly_name' => __('Username (v3)'),
-			'description' => __('The SNMP v3 Username for polling hosts.'),
-			'method' => 'textbox',
-			'default' => '',
-			'max_length' => '100',
+		'snmp_security_level' => array(
+			'friendly_name' => __('Security Level'),
+			'description' => __('Default SNMP v3 Security Level for all new Devices.'),
+			'method' => 'drop_array',
+			'default' => 'authPriv',
+			'array' => $snmp_security_levels,
 			),
-		'snmp_password' => array(
-			'friendly_name' => __('Password (v3)'),
-			'description' => __('The SNMP v3 Password for polling hosts.'),
-			'method' => 'textbox_password',
+		'snmp_username' => array(
+			'friendly_name' => __('Auth User (v3)'),
+			'description' => __('Default SNMP v3 Authorization User for all new Devices.'),
+			'method' => 'textbox',
 			'default' => '',
 			'max_length' => '100',
 			),
 		'snmp_auth_protocol' => array(
 			'method' => 'drop_array',
 			'friendly_name' => __('Auth Protocol (v3)'),
-			'description' => __('Choose the SNMPv3 Authorization Protocol.'),
+			'description' => __('Default SNMPv3 Authorization Protocol for all new Devices.'),
 			'default' => 'MD5',
 			'array' => $snmp_auth_protocols,
 			),
-		'snmp_priv_passphrase' => array(
-			'method' => 'textbox',
-			'friendly_name' => __('Privacy Passphrase (v3)'),
-			'description' => __('Choose the SNMPv3 Privacy Passphrase.'),
+		'snmp_password' => array(
+			'friendly_name' => __('Auth Passphrase (v3)'),
+			'description' => __('Default SNMP v3 Authorization Passphrase for all new Devices.'),
+			'method' => 'textbox_password',
 			'default' => '',
-			'max_length' => '200'
+			'max_length' => '100',
 			),
 		'snmp_priv_protocol' => array(
 			'method' => 'drop_array',
 			'friendly_name' => __('Privacy Protocol (v3)'),
-			'description' => __('Choose the SNMPv3 Privacy Protocol.'),
+			'description' => __('Default SNMPv3 Privacy Protocol for all new Devices.'),
 			'default' => 'DES',
 			'array' => $snmp_priv_protocols,
 			),
-		'snmp_timeout' => array(
-			'friendly_name' => __('Timeout'),
-			'description' => __('Default SNMP timeout in milli-seconds.'),
+		'snmp_priv_passphrase' => array(
 			'method' => 'textbox',
-			'default' => '500',
-			'max_length' => '10',
-			'size' => '5'
+			'friendly_name' => __('Privacy Passphrase (v3).'),
+			'description' => __('Default SNMPv3 Privacy Passphrase for all new Devices.'),
+			'default' => '',
+			'max_length' => '200'
+			),
+		'snmp_context' => array(
+			'method' => 'textbox',
+			'friendly_name' => __('SNMP Context (v3)'),
+			'description' => __('Enter the SNMP v3 Context for all new Devices.'),
+			'value' => '|arg1:snmp_context|',
+			'default' => '',
+			'max_length' => '64',
+			'size' => '40'
+			),
+		'snmp_engine_id' => array(
+			'method' => 'textbox',
+			'friendly_name' => __('SNMP Engine ID (v3)'),
+			'description' => __('Default SNMP v3 Engine Id for all new Devices. Leave this field empty to use the SNMP Engine ID being defined per SNMPv3 Notification receiver.'),
+			'value' => '|arg1:snmp_engine_id|',
+			'default' => '',
+			'max_length' => '64',
+			'size' => '40'
 			),
 		'snmp_port' => array(
 			'friendly_name' => __('Port Number'),
-			'description' => __('Default UDP port to be used for SNMP Calls.  Typically, 161.'),
+			'description' => __('Default UDP Port for all new Devices.  Typically 161.'),
 			'method' => 'textbox',
 			'default' => '161',
 			'max_length' => '10',
 			'size' => '5'
 			),
+		'snmp_timeout' => array(
+			'friendly_name' => __('Timeout'),
+			'description' => __('Default SNMP timeout in milli-seconds for all new Devices.'),
+			'method' => 'textbox',
+			'default' => '500',
+			'max_length' => '10',
+			'size' => '5'
+			),
 		'snmp_retries' => array(
 			'friendly_name' => __('Retries'),
-			'description' => __('The number of times the SNMP poller will attempt to reach the host before failing.'),
+			'description' => __('Default SNMP retries for all new Devices.'),
 			'method' => 'textbox',
 			'default' => '3',
 			'max_length' => '10',
@@ -569,21 +723,21 @@ $settings = array(
 			),
 		'availability_method' => array(
 			'friendly_name' => __('Downed Device Detection'),
-			'description' => __('The method Cacti will use to determine if a host is available for polling.  <br><i>NOTE: It is recommended that, at a minimum, SNMP always be selected.</i>'),
+			'description' => __('Default Availability/Reachability for all new Devices.  The method Cacti will use to determine if a Device is available for polling.  <br><i>NOTE: It is recommended that, at a minimum, SNMP always be selected.</i>'),
 			'method' => 'drop_array',
 			'default' => AVAIL_SNMP,
 			'array' => $availability_options,
 			),
 		'ping_method' => array(
 			'friendly_name' => __('Ping Type'),
-			'description' => __('The type of ping packet to send.  <br><i>NOTE: ICMP requires that the Cacti Service ID have root privileges in UNIX/Linux.</i>'),
+			'description' => __('Default Ping type for all new Devices.</i>'),
 			'method' => 'drop_array',
 			'default' => PING_UDP,
 			'array' => $ping_methods,
 			),
 		'ping_port' => array(
 			'friendly_name' => __('Ping Port'),
-			'description' => __('When choosing either TCP or UDP Ping, which port should be checked for availability of the host prior to polling.'),
+			'description' => __('Default Ping Port for all new Devices.  With TCP, Cacti will attempt to Syn the port.  With UDP, Cacti requires either a successful connection, or a \'port not reachable\' error to determine if the Device is up or not.'),
 			'method' => 'textbox',
 			'default' => '23',
 			'max_length' => '10',
@@ -591,7 +745,7 @@ $settings = array(
 			),
 		'ping_timeout' => array(
 			'friendly_name' => __('Ping Timeout Value'),
-			'description' => __('The timeout value to use for host ICMP and UDP pinging.  This host SNMP timeout value applies for SNMP pings.'),
+			'description' => __('Default Ping Timeout value in milli-seconds for all new Devices.  The timeout values to use for Device SNMP, ICMP, UDP and TCP pinging.  ICMP Pings will be rounded up to the nearest second.  TCP and UDP connection timeouts on Windows are controlled by the operating system, and are therefore not recommended on Windows.'),
 			'method' => 'textbox',
 			'default' => '400',
 			'max_length' => '10',
@@ -599,7 +753,7 @@ $settings = array(
 			),
 		'ping_retries' => array(
 			'friendly_name' => __('Ping Retry Count'),
-			'description' => __('The number of times Cacti will attempt to ping a host before failing.'),
+			'description' => __('The number of times Cacti will attempt to ping a Device before marking it as down.'),
 			'method' => 'textbox',
 			'default' => '1',
 			'max_length' => '10',
@@ -612,7 +766,7 @@ $settings = array(
 			),
 		'ping_failure_count' => array(
 			'friendly_name' => __('Failure Count'),
-			'description' => __('The number of polling intervals a host must be down before logging an error and reporting host as down.'),
+			'description' => __('The number of polling intervals a Device must be down before logging an error and reporting Device as down.'),
 			'method' => 'textbox',
 			'default' => '2',
 			'max_length' => '10',
@@ -620,7 +774,7 @@ $settings = array(
 			),
 		'ping_recovery_count' => array(
 			'friendly_name' => __('Recovery Count'),
-			'description' => __('The number of polling intervals a host must remain up before returning host to an up status and issuing a notice.'),
+			'description' => __('The number of polling intervals a Device must remain up before returning Device to an up status and issuing a notice.'),
 			'method' => 'textbox',
 			'default' => '3',
 			'max_length' => '10',
@@ -637,7 +791,7 @@ $settings = array(
 			'friendly_name' => __('Theme'),
 			'description' => __('Please select one of the available Themes to skin your Cacti with.'),
 			'method' => 'drop_array',
-			'default' => 'classic',
+			'default' => 'modern',
 			'array' => $themes
 			),
 		'table_header' => array(
@@ -667,6 +821,38 @@ $settings = array(
 			'method' => 'drop_array',
 			'default' => '30',
 			'array' => $item_rows
+			),
+		'tree_header' => array(
+			'friendly_name' => __('Tree Settings'),
+			'collapsible' => 'true',
+			'method' => 'spacer',
+			),
+		'min_tree_width' => array(
+			'friendly_name' => __('Minimum Tree Width'),
+			'description' => __('The Minimum width of the Tree to contract to.'),
+			'method' => 'textbox',
+			'default' => '170',
+			'max_length' => '5',
+			'size' => '7'
+			),
+		'max_tree_width' => array(
+			'friendly_name' => __('Maximum Tree Width'),
+			'description' => __('The Maximum width of the Tree to expand to, after which time, Tree branches will scroll on the page.'),
+			'method' => 'textbox',
+			'default' => '300',
+			'max_length' => '5',
+			'size' => '7'
+			),
+		'filter_header' => array(
+			'friendly_name' => __('Filter Settings'),
+			'collapsible' => 'true',
+			'method' => 'spacer',
+			),
+		'strip_domain' => array(
+			'friendly_name' => __('Strip Domains from Device Dropdowns'),
+			'description' => __('When viewing Device name filter dropdowns, checking this option will strip to domain from the hostname.'),
+			'method' => 'checkbox',
+			'default' => ''
 			),
 		'object_creation_header' => array(
 			'friendly_name' => __('Graph/Data Source/Data Query Settings'),
@@ -699,7 +885,9 @@ $settings = array(
 			'description' => __('When creating graphs, what Graph Type would you like pre-selected?'),
 			'method' => 'drop_array',
 			'default' => '-2',
-			'array' => array( '-2' => __('All Types'), '-1' => __('By Template/Data Query') ),
+			'array' => array(
+				'-2' => __('All Types'),
+				'-1' => __('By Template/Data Query'))
 			),
 		'logmgmt_header' => array(
 			'friendly_name' => __('Log Management'),
@@ -797,7 +985,9 @@ $settings = array(
 			'description' => __('How do you wish fonts to be handled by default?'),
 			'method' => 'drop_array',
 			'default' => 1,
-			'array' => array(0 => __('System'), 1 => __('Theme'))
+			'array' => array(
+				0 => __('System'),
+				1 => __('Theme'))
 			),
 		'path_rrdtool_default_font' => array(
 			'friendly_name' => __('Default Font'),
@@ -880,17 +1070,30 @@ $settings = array(
 			'default' => 'on',
 			'tab' => 'poller'
 			),
+		'enable_snmp_agent' => array(
+			'friendly_name' => __('SNMP Agent Support Enabled'),
+			'description' => __('If this option is checked, Cacti will populate SNMP Agent tables with Cacti device and system information.  It does not enable the SNMP Agent itself.'),
+			'method' => 'checkbox',
+			'default' => 'on'
+			),
 		'poller_type' => array(
 			'friendly_name' => __('Poller Type'),
-			'description' => __('The poller type to use.  This setting will take effect at next polling interval.'),
+			'description' => __('The poller type to use.  This setting will take affect at next polling interval.'),
 			'method' => 'drop_array',
 			'default' => 1,
 			'array' => $poller_options,
 			),
+
+		'poller_sync_interval' => array(
+			'friendly_name' => __('Poller Sync Interval'),
+			'description' => __('The default polling sync interval to use when creating a poller.  This setting will affect how often remote pollers are checked and updated.'),
+			'method' => 'drop_array',
+			'default' => 7200,
+			'array' => $poller_sync_intervals,
+			),
 		'poller_interval' => array(
 			'friendly_name' => __('Poller Interval'),
-			'description' => __('The polling interval in use.  This setting will effect how often RRDfiles are checked and updated.
-			<strong><u>NOTE: If you change this value, you must re-populate the poller cache.  Failure to do so, may result in lost data.</u></strong>'),
+			'description' => __('The polling interval in use.  This setting will affect how often RRDfiles are checked and updated.  <strong><u>NOTE: If you change this value, you must re-populate the poller cache.  Failure to do so, may result in lost data.</u></strong>'),
 			'method' => 'drop_array',
 			'default' => 300,
 			'array' => $poller_intervals,
@@ -903,8 +1106,8 @@ $settings = array(
 			'array' => $cron_intervals,
 			),
 		'concurrent_processes' => array(
-			'friendly_name' => __('Maximum Concurrent Poller Processes'),
-			'description' => __('The number of concurrent processes to execute.  Using a higher number when using cmd.php will improve performance.  Performance improvements in spine are best resolved with the threads parameter'),
+			'friendly_name' => __('Default Data Collector Processes'),
+			'description' => __('The default number of concurrent processes to execute per Data Collector.  NOTE: Starting from Cacti 1.2, this setting is maintained in the Data Collector.  Moving forward, this value is only a preset for the Data Collector.  Using a higher number when using cmd.php will improve performance.  Performance improvements in Spine are best resolved with the threads parameter.  When using Spine, we recommend a lower number and leveraging threads instead.  When using cmd.php, use no more than 2x the number of CPU cores.'),
 			'method' => 'textbox',
 			'default' => '1',
 			'max_length' => '10',
@@ -916,11 +1119,124 @@ $settings = array(
 			'method' => 'checkbox',
 			'default' => 'on'
 			),
+		'poller_debug' => array(
+			'friendly_name' => __('Debug Output Width'),
+			'description' => __('If you choose this option, Cacti will check for output that exceeds Cacti\'s ability to store it and issue a warning when it finds it.'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
 		'oid_increasing_check_disable' => array(
 			'friendly_name' => __('Disable increasing OID Check'),
 			'description' => __('Controls disabling check for increasing OID while walking OID tree.'),
 			'method' => 'checkbox',
 			'default' => ''
+			),
+		'remote_agent_timeout' => array(
+			'friendly_name' => __('Remote Agent Timeout'),
+			'description' => __('The amount of time, in seconds, that the Central Cacti web server will wait for a response from the Remote Data Collector to obtain various Device information before abandoning the request.  On Devices that are associated with Data Collectors other than the Central Cacti Data Collector, the Remote Agent must be used to gather Device information.'),
+			'method' => 'drop_array',
+			'default' => '5',
+			'array' => array(
+				5 => __('%d Seconds', 5),
+				10 => __('%d Seconds', 10),
+				15 => __('%d Seconds', 15),
+				20 => __('%d Seconds', 20)
+				)
+			),
+		'snmp_bulk_walk_size' => array(
+			'friendly_name' => __('SNMP Bulkwalk Fetch Size'),
+			'description' => __('How many OID\'s should be returned per snmpbulkwalk request?  For Devices with large SNMP trees, increasing this size will increase re-index performance over a WAN.'),
+			'method' => 'drop_array',
+			'default' => '10',
+			'array' => array(
+				'10' => '10',
+				'20' => '20',
+				'30' => '30',
+				'40' => '40',
+				'50' => '50',
+				'60' => '60',
+				'70' => '70',
+				'80' => '80',
+				'90' => '90',
+				'100' => '100',
+				'150' => '150',
+				'200' => '200')
+			),
+		'disable_cache_replication' => array(
+			'friendly_name' => __('Disable Resource Cache Replication'),
+			'description' => __('By default, the main Cacti Data Collector will cache the entire web site and plugins into a Resource Cache.  Then, periodically the Remote Data Collectors will update themeselves with any updates from the main Cacti Data Collector.  This Resource Cache essentially allows Remote Data Collectors to self upgrade.  If you do not wish to use this option, you can disable it using this setting.'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
+		'timeouts_header' => array(
+			'friendly_name' => __('Background Timeout Settings'),
+			'collapsible' => 'true',
+			'method' => 'spacer',
+			),
+		'reports_timeout' => array(
+			'friendly_name' => __('Report Generation Timeout'),
+			'description' => __('The maximum amount of time Cacti\'s Reports Generation script can run without generating a timeout error and being killed.'),
+			'method' => 'drop_array',
+			'default' => '300',
+			'array' => array(
+				'60'   => __('%s Minute', 1),
+				'120'  => __('%s Minutes', 2),
+				'300'  => __('%s Minutes', 5),
+				'600'  => __('%s Minutes', 10),
+				'1200' => __('%s Minutes', 20))
+			),
+		'dsstats_timeout' => array(
+			'friendly_name' => __('Data Source Statistics Timeout'),
+			'description' => __('The maximum amount of time Cacti\'s Data Source Statistics script can run without generating a timeout error and being killed.'),
+			'method' => 'drop_array',
+			'default' => '300',
+			'array' => array(
+				'60'   => __('%s Minute', 1),
+				'120'  => __('%s Minutes', 2),
+				'300'  => __('%s Minutes', 5),
+				'600'  => __('%s Minutes', 10),
+				'1200' => __('%s Minutes', 20))
+			),
+		'commands_timeout' => array(
+			'friendly_name' => __('Background Commands Timeout'),
+			'description' => __('The maximum amount of time Cacti\'s Background Commands script can run without generating a timeout error and being killed.'),
+			'method' => 'drop_array',
+			'default' => '300',
+			'array' => array(
+				'60'   => __('%s Minute', 1),
+				'120'  => __('%s Minutes', 2),
+				'300'  => __('%s Minutes', 5),
+				'600'  => __('%s Minutes', 10),
+				'1200' => __('%s Minutes', 20))
+			),
+		'maintenance_timeout' => array(
+			'friendly_name' => __('Maintenance Background Generation Timeout'),
+			'description' => __('The maximum amount of time a Cacti\'s Maintenance script can run without generating a timeout error and being killed.'),
+			'method' => 'drop_array',
+			'default' => '300',
+			'array' => array(
+				'60'   => __('%s Minute', 1),
+				'120'  => __('%s Minutes', 2),
+				'300'  => __('%s Minutes', 5),
+				'600'  => __('%s Minutes', 10),
+				'1200' => __('%s Minutes', 20),
+				'3600' => __('%s Hour', 1))
+			),
+		'spikekill_timeout' => array(
+			'friendly_name' => __('Spikekill Background Generation Timeout'),
+			'description' => __('The maximum amount of time a Cacti\'s Spikekill script can run without generating a timeout error and being killed.'),
+			'method' => 'drop_array',
+			'default' => '3600',
+			'array' => array(
+				'60'    => __('%s Minute', 1),
+				'120'   => __('%s Minutes', 2),
+				'300'   => __('%s Minutes', 5),
+				'600'   => __('%s Minutes', 10),
+				'1200'  => __('%s Minutes', 20),
+				'3600'  => __('%s Hour', 1),
+				'7200'  => __('%s Hours', 2),
+				'14400' => __('%s Hours', 4),
+				'28800' => __('%s Hours', 8))
 			),
 		'spine_header' => array(
 			'friendly_name' => __('Spine Specific Execution Parameters'),
@@ -929,18 +1245,17 @@ $settings = array(
 			),
 		'spine_log_level' => array(
 			'friendly_name' => __('Invalid Data Logging'),
-			'description' => __('How would you like Spine output errors logged?  The options are: \'Detailed\' which is similar to cmd.php logging; \'Summary\' which provides the number of output errors per host; and \'None\', which does not provide error counts.'),
+			'description' => __('How would you like Spine output errors logged?  The options are: \'Detailed\' which is similar to cmd.php logging; \'Summary\' which provides the number of output errors per Device; and \'None\', which does not provide error counts.'),
 			'method' => 'drop_array',
 			'default' => '0',
 			'array' => array(
 				'0'  => __('None'),
 				'1'  => __('Summary'),
-				'2'  => __('Detailed')
-				),
+				'2'  => __('Detailed'))
 			),
 		'max_threads' => array(
-			'friendly_name' => __('Maximum Threads per Process'),
-			'description' => __('The maximum threads allowed per process.  Using a higher number when using Spine will improve performance.'),
+			'friendly_name' => __('Default Threads per Process'),
+			'description' => __('The Default Threads allowed per process.  NOTE: Starting in Cacti 1.2+, this setting is maintained in the Data Collector, and this is simply the Preset.  Using a higher number when using Spine will improve performance.  However, ensure that you have enough MySQL/MariaDB connections to support the following equation: connections = data collectors * processes * (threads + script servers).  You must also ensure that you have enough spare connections for user login connections as well.'),
 			'method' => 'textbox',
 			'default' => '1',
 			'max_length' => '10',
@@ -979,7 +1294,7 @@ $settings = array(
 			),
 		'auth_method' => array(
 			'friendly_name' => __('Authentication Method'),
-			'description' => __('<blockquote><i>None</i> - No authentication will be used, all users will have full access.<br><br><i>Built-in Authentication</i> - Cacti handles user authentication, which allows you to create users and give them rights to different areas within Cacti.<br><br><i>Web Basic Authentication</i> - Authentication is handled by the web server. Users can be added or created automatically on first login if the Template User is defined, otherwise the defined guest permissions will be used.<br><br><i>LDAP Authentication</i> - Allows for authentication against a LDAP server. Users will be created automatically on first login if the Template User is defined, otherwise the defined guest permissions will be used.  If PHPs LDAP module is not enabled, LDAP Authentication will not appear as a selectable option.<br><br><i>Multiple LDAP/AD Domain Authentication</i> - Allows administrators to support multiple disparate groups from different LDAP/AD directories to access Cacti resources.  Just as LDAP Authentication, the PHP LDAP module is required to utilize this method.</blockquote>'),
+			'description' => __('<blockquote><i>Built-in Authentication</i> - Cacti handles user authentication, which allows you to create users and give them rights to different areas within Cacti.<br><br><i>Web Basic Authentication</i> - Authentication is handled by the web server. Users can be added or created automatically on first login if the Template User is defined, otherwise the defined guest permissions will be used.<br><br><i>LDAP Authentication</i> - Allows for authentication against a LDAP server. Users will be created automatically on first login if the Template User is defined, otherwise the defined guest permissions will be used.  If PHPs LDAP module is not enabled, LDAP Authentication will not appear as a selectable option.<br><br><i>Multiple LDAP/AD Domain Authentication</i> - Allows administrators to support multiple disparate groups from different LDAP/AD directories to access Cacti resources.  Just as LDAP Authentication, the PHP LDAP module is required to utilize this method.</blockquote>'),
 			'method' => 'drop_array',
 			'default' => 1,
 			'array' => $auth_methods
@@ -995,21 +1310,38 @@ $settings = array(
 			'method' => 'spacer',
 			'collapsible' => 'true'
 			),
+		'admin_user' => array(
+			'friendly_name' => __('Primary Admin'),
+			'description' => __('The name of the primary administrative account that will automatically receive Emails when the Cacti system experiences issues.  To receive these Emails, ensure that your mail settings are correct, and the administrative account has an Email address that is set.'),
+			'method' => 'drop_sql',
+			'none_value' => __('No User'),
+			'sql' => 'SELECT id AS id, username AS name FROM user_auth WHERE realm = 0 ORDER BY username',
+			'default' => '1'
+			),
 		'guest_user' => array(
 			'friendly_name' => __('Guest User'),
 			'description' => __('The name of the guest user for viewing graphs; is \'No User\' by default.'),
 			'method' => 'drop_sql',
 			'none_value' => __('No User'),
-			'sql' => 'SELECT username AS id, username AS name FROM user_auth WHERE realm = 0 ORDER BY username',
+			'sql' => 'SELECT id AS id, username AS name FROM user_auth WHERE realm = 0 ORDER BY username',
 			'default' => '0'
 			),
 		'user_template' => array(
 			'friendly_name' => __('User Template'),
-			'description' => __('The name of the user that Cacti will use as a template for new Web Basic and LDAP users; is \'guest\' by default.'),
+			'description' => __('The name of the user that Cacti will use as a template for new Web Basic and LDAP users; is \'guest\' by default.  This user account will be disabled from logging in upon being selected.'),
 			'method' => 'drop_sql',
 			'none_value' => __('No User'),
-			'sql' => 'SELECT username AS id, username AS name FROM user_auth WHERE realm = 0 ORDER BY username',
+			'sql' => 'SELECT id AS id, username AS name FROM user_auth WHERE realm = 0 ORDER BY username',
 			'default' => '0'
+			),
+		'path_basic_mapfile' => array(
+			'friendly_name' => __('Basic Auth Mapfile'),
+			'description' => __('When using basic authentication, if the basic account needs to be translated to a different login account, you can specify a CSV file here to map the basic account to the desired login account.'),
+			'method' => 'filepath',
+			'file_type' => 'ascii',
+			'max_length' => 255,
+			'default' => '',
+			'install_optional' => true
 			),
 		'secpass_header' => array(
 			'friendly_name' => __('Local Account Complexity Requirements'),
@@ -1054,13 +1386,13 @@ $settings = array(
 			'method' => 'drop_array',
 			'default' => '0',
 			'array' => array(
-				'0'  => __('Disabled'),
+				'0'   => __('Disabled'),
 				'30'  => __('%d Days', 30),
 				'60'  => __('%d Days', 60),
 				'90'  => __('%d Days', 90),
-				'120'  => __('%d Days', 120),
-				'365'  => __('%d Year', 1),
-				'730'  => __('%d Years', 2) )
+				'120' => __('%d Days', 120),
+				'365' => __('%d Year', 1),
+				'730' => __('%d Years', 2) )
 			),
 		'secpass_expirepass' => array(
 			'friendly_name' => __('Expire Password'),
@@ -1068,11 +1400,11 @@ $settings = array(
 			'method' => 'drop_array',
 			'default' => '0',
 			'array' => array(
-			'0'  => __('Disabled'),
+				'0'   => __('Disabled'),
 				'30'  => __('%d Days', 30),
 				'60'  => __('%d Days', 60),
 				'90'  => __('%d Days', 90),
-				'120'  => __('%d Days', 120) )
+				'120' => __('%d Days', 120))
 			),
 		'secpass_history' => array(
 			'friendly_name' => __('Password History'),
@@ -1105,13 +1437,13 @@ $settings = array(
 			'method' => 'drop_array',
 			'default' => '0',
 			'array' => array(
-				'0'  => __('Disabled'),
-				'1'  => __('1 Attempt'),
-				'2'  => __('%d Attempts', 2),
-				'3'  => __('%d Attempts', 3),
-				'4'  => __('%d Attempts', 4),
-				'5'  => __('%d Attempts', 5),
-				'6'  => __('%d Attempts', 6) )
+				'0' => __('Disabled'),
+				'1' => __('1 Attempt'),
+				'2' => __('%d Attempts', 2),
+				'3' => __('%d Attempts', 3),
+				'4' => __('%d Attempts', 4),
+				'5' => __('%d Attempts', 5),
+				'6' => __('%d Attempts', 6) )
 			),
 		'secpass_unlocktime' => array(
 			'friendly_name' => __('Auto Unlock'),
@@ -1119,19 +1451,19 @@ $settings = array(
 			'method' => 'drop_array',
 			'default' => '60',
 			'array' => array(
-				'0'  => __('Disabled'),
-				'1'  => __('1 Minute'),
-				'2'  => __('%d Minutes', 2),
-				'5'  => __('%d Minutes', 5),
-				'10'  => __('%d Minutes', 10),
-				'20'  => __('%d Minutes', 20),
-				'30'  => __('%d Minutes', 30),
-				'60'  => __('1 Hour'),
+				'0'    => __('Disabled'),
+				'1'    => __('1 Minute'),
+				'2'    => __('%d Minutes', 2),
+				'5'    => __('%d Minutes', 5),
+				'10'   => __('%d Minutes', 10),
+				'20'   => __('%d Minutes', 20),
+				'30'   => __('%d Minutes', 30),
+				'60'   => __('1 Hour'),
 				'120'  => __('%d Hours', 2),
 				'240'  => __('%d Hours', 4),
 				'480'  => __('%d Hours', 8),
 				'960'  => __('%d Hours', 16),
-				'1440'  => __('1 Day') )
+				'1440' => __('1 Day') )
 			),
 		'ldap_general_header' => array(
 			'friendly_name' => __('LDAP General Settings'),
@@ -1178,7 +1510,9 @@ $settings = array(
 			'description' => __('Enable or Disable LDAP referrals.  If disabled, it may increase the speed of searches.'),
 			'method' => 'drop_array',
 			'default' => '0',
-			'array' => array( '0' => __('Disabled'), '1' => __('Enable'))
+			'array' => array(
+				'0' => __('Disabled'),
+				'1' => __('Enable'))
 			),
 		'ldap_mode' => array(
 			'friendly_name' => __('Mode'),
@@ -1220,7 +1554,9 @@ $settings = array(
 			'description' => __('Defines if users use full Distinguished Name or just Username in the defined Group Member Attribute.'),
 			'method' => 'drop_array',
 			'default' => 1,
-			'array' => array( 1 => __('Distinguished Name'), 2 => __('Username') )
+			'array' => array(
+				1 => __('Distinguished Name'),
+				2 => __('Username'))
 			),
 		'ldap_search_base_header' => array(
 			'friendly_name' => __('LDAP Specific Search Settings'),
@@ -1250,6 +1586,22 @@ $settings = array(
 			'method' => 'textbox_password',
 			'max_length' => '255'
 			),
+		'cn_header' => array(
+			'friendly_name' => __('LDAP CN Settings'),
+			'method' => 'spacer'
+			),
+		'cn_full_name' => array(
+			'friendly_name' => __('Full Name'),
+			'description' => __('Field that will replace the Full Name when creating a new user, taken from LDAP. (on windows: displayname) '),
+			'method' => 'textbox',
+			'max_length' => '255'
+			),
+		'cn_email' => array(
+			'friendly_name' => __('Email'),
+			'description' => __('Field that will replace the Email taken from LDAP. (on windows: mail)'),
+			'method' => 'textbox',
+			'max_length' => '255'
+			),
 		),
 	'mail' => array(
 		'settings_web_url' => array(
@@ -1259,15 +1611,21 @@ $settings = array(
 			),
 		'base_url' => array(
 			'friendly_name' => __('Server Base URL'),
-			'description' => __('This is a the server location that will be used for links to the Cacti site.'),
+			'description' => __('This is a the server location that will be used for links to the Cacti site. This should include the subdirectory if Cacti does not run from root folder.'),
 			'method' => 'textbox',
 			'max_length' => 255,
 			'size' => '60',
-			'default' => 'http://' . gethostname()
+			'default' => 'http://' . gethostname() . $config['url_path']
 			),
 		'settings_email_header' => array(
-			'friendly_name' => __('Emailing Options<div id="emailtest" class="emailtest textSubHeaderDark">Send a Test Email</div>'),
+			'friendly_name' => __('Emailing Options'),
 			'method' => 'spacer',
+			),
+		'notify_admin' => array(
+			'friendly_name' => __('Notify Primary Admin of Issues'),
+			'description' => __('In cases where the Cacti server is experiencing problems, should the Primary Administrator be notified by Email?  The Primary Administrator\'s Cacti user account is specified under the Authentication tab on Cacti\'s settings page. It defaults to the \'admin\' account.'),
+			'default' => '',
+			'method' => 'checkbox'
 			),
 		'settings_test_email' => array(
 			'friendly_name' => __('Test Email'),
@@ -1279,15 +1637,17 @@ $settings = array(
 			'friendly_name' => __('Mail Services'),
 			'description' => __('Which mail service to use in order to send mail'),
 			'method' => 'drop_array',
-			'default' => __('PHP Mail() Function'),
-			'array' => array( __('PHP Mail() Function'), __('Sendmail'), __('SMTP') ),
+			'default' => 0,
+			'array' => $mail_methods,
 			),
 		'settings_ping_mail' => array(
 			'friendly_name' => __('Ping Mail Server'),
 			'description' => __('Ping the Mail Server before sending test Email?'),
 			'method' => 'drop_array',
 			'default' => 0,
-			'array' => array(0 => __('Yes'), 1 => __('No'))
+			'array' => array(
+				0 => __('Yes'),
+				1 => __('No'))
 			),
 		'settings_from_email' => array(
 			'friendly_name' => __('From Email Address'),
@@ -1318,8 +1678,10 @@ $settings = array(
 			'friendly_name' => __('Sendmail Path'),
 			'description' => __('This is the path to sendmail on your server. (Only used if Sendmail is selected as the Mail Service)'),
 			'method' => 'filepath',
+			'file_type' => 'binary',
 			'max_length' => 255,
-			'default' => '/usr/sbin/sendmail',
+			'default' => '',
+			'install_optional' => true
 			),
 		'settings_smtp_header' => array(
 			'friendly_name' => __('SMTP Options'),
@@ -1357,7 +1719,10 @@ $settings = array(
 			'friendly_name' => __('SMTP Security'),
 			'description' => __('The encryption method to use for the Email.'),
 			'method' => 'drop_array',
-			'array' => array( 'none' => __('None'), 'ssl' => __('SSL'), 'tls' => __('TLS') ),
+			'array' => array(
+				'none' => __('None'),
+				'ssl'  => __('SSL'),
+				'tls'  => __('TLS')),
 			'default' => 'none'
 			),
 		'settings_smtp_timeout' => array(
@@ -1428,7 +1793,119 @@ $settings = array(
 			'size' => '5'
 			),
 		),
-	'dsstats' => array(
+	'boost' => array(
+		'boost_hq_header' => array(
+			'friendly_name' => __('On-demand RRD Update Settings'),
+			'method' => 'spacer',
+			'collapsible' => 'true'
+			),
+		'boost_rrd_update_enable' => array(
+			'friendly_name' => __('Enable On-demand RRD Updating'),
+			'description' => __('Should Boost enable on demand RRD updating in Cacti?  If you disable, this change will not take affect until after the next polling cycle.  When you have Remote Data Collectors, this settings is required to be on.'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
+		'boost_rrd_update_system_enable' => array(
+			'friendly_name' => __('System Level RRD Updater'),
+			'description' => __('Before RRD On-demand Update Can be Cleared, a poller run must always pass'),
+			'method' => 'hidden',
+			'default' => ''
+			),
+		'boost_rrd_update_interval' => array(
+			'friendly_name' => __('How Often Should Boost Update All RRDs'),
+			'description' => __('When you enable boost, your RRD files are only updated when they are requested by a user, or when this time period elapses.'),
+			'default' => '60',
+			'method' => 'drop_array',
+			'array' => $boost_refresh_interval
+			),
+		'boost_parallel' => array(
+			'friendly_name' => __('Number of Boost Processes'),
+			'description' => __('The number of concurrent boost processes to use to use to process all of the RRDs in the boost table.'),
+			'default' => '1',
+			'method' => 'drop_array',
+			'array' => array(
+				1  => __('1 Process'),
+				2  => __('%d Processes', 2),
+				3  => __('%d Processes', 3),
+				4  => __('%d Processes', 4),
+				5  => __('%d Processes', 5),
+				6  => __('%d Processes', 6),
+				7  => __('%d Processes', 7),
+				8  => __('%d Processes', 8),
+				9  => __('%d Processes', 9),
+				10 => __('%d Processes', 10))
+			),
+		'boost_rrd_update_max_records' => array(
+			'friendly_name' => __('Maximum Records'),
+			'description' => __('If the boost output table exceeds this size, in records, an update will take place.'),
+			'method' => 'textbox',
+			'default' => '1000000',
+			'max_length' => '20',
+			'size' => '10'
+			),
+		'boost_rrd_update_max_records_per_select' => array(
+			'friendly_name' => __('Maximum Data Source Items Per Pass'),
+			'description' => __('To optimize performance, the boost RRD updater needs to know how many Data Source Items should be retrieved in one pass.  Please be careful not to set too high as graphing performance during major updates can be compromised.  If you encounter graphing or polling slowness during updates, lower this number.  The default value is 50000.'),
+			'method' => 'drop_array',
+			'default' => '50000',
+			'array' => $boost_max_rows_per_select
+			),
+		'boost_rrd_update_string_length' => array(
+			'friendly_name' => __('Maximum Argument Length'),
+			'description' => __('When boost sends update commands to RRDtool, it must not exceed the operating systems Maximum Argument Length.  This varies by operating system and kernel level.  For example: Windows 2000 <= 2048, FreeBSD <= 65535, Linux 2.6.22-- <= 131072, Linux 2.6.23++ unlimited'),
+			'method' => 'textbox',
+			'default' => '2000',
+			'max_length' => '20',
+			'size' => '10'
+			),
+		'boost_poller_mem_limit' => array(
+			'friendly_name' => __('Memory Limit for Boost and Poller'),
+			'description' => __('The maximum amount of memory for the Cacti Poller and Boosts Poller'),
+			'method' => 'drop_array',
+			'default' => '1024',
+			'array' => $boost_max_memory
+			),
+		'boost_rrd_update_max_runtime' => array(
+			'friendly_name' => __('Maximum RRD Update Script Run Time'),
+			'description' => __('If the boost poller excceds this runtime, a warning will be placed in the cacti log,'),
+			'method' => 'drop_array',
+			'default' => '1200',
+			'array' => $boost_max_runtime
+			),
+		'boost_redirect' => array(
+			'friendly_name' => __('Enable direct population of poller_output_boost table'),
+			'description' => __('Enables direct insert of records into poller output boost with results in a 25% time reduction in each poll cycle.'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
+		'path_boost_log' => array(
+			'friendly_name' => __('Boost Debug Log'),
+			'description' => __('If this field is non-blank, Boost will log RRDupdate output from the boost	poller process.'),
+			'method' => 'filepath',
+			'file_type' => 'ascii',
+			'default' => '',
+			'max_length' => '255'
+			),
+		'boost_png_header' => array(
+			'friendly_name' => __('Image Caching'),
+			'method' => 'spacer',
+			'collapsible' => 'true'
+			),
+		'boost_png_cache_enable' => array(
+			'friendly_name' => __('Enable Image Caching'),
+			'description' => __('Should image caching be enabled?'),
+			'method' => 'checkbox',
+			'default' => ''
+			),
+		'boost_png_cache_directory' => array(
+			'friendly_name' => __('Location for Image Files'),
+			'description' => __('Specify the location where Boost should place your image files.  These files will be automatically purged by the poller when they expire.'),
+			'method' => 'dirpath',
+			'max_length' => '255',
+			'default' => $config['base_path'] . '/cache/boost/'
+			)
+		),
+	'data' => array(
 		'dsstats_hq_header' => array(
 			'friendly_name' => __('Data Sources Statistics'),
 			'collapsible' => 'true',
@@ -1469,127 +1946,8 @@ $settings = array(
 			'default' => '1024',
 			'array' => $dsstats_max_memory
 			),
-		'dsstats_debug_header' => array(
-			'friendly_name' => __('Debugging'),
-			'method' => 'spacer',
-			'collapsible' => 'true',
-			),
-		'dsstats_rrdtool_pipe' => array(
-			'friendly_name' => __('Enable Single RRDtool Pipe'),
-			'description' => __('Using a single pipe will speed the RRDtool process by 10x.  However, RRDtool crashes problems can occur.  Disable this setting if you need to find a bad RRDfile.'),
-			'method' => 'checkbox',
-			'default' => 'on'
-			),
-		'dsstats_partial_retrieve' => array(
-			'friendly_name' => __('Enable Partial Reference Data Retrieve'),
-			'description' => __('If using a large system, it may be beneficial for you to only gather data as needed during Cacti poller passes.  If you check this box, Data Source Statistics will gather data this way.'),
-			'method' => 'checkbox',
-			'default' => ''
-			)
-		),
-	'boost' => array(
-		'boost_hq_header' => array(
-			'friendly_name' => __('On-demand RRD Update Settings'),
-			'method' => 'spacer',
-			'collapsible' => 'true'
-			),
-		'boost_rrd_update_enable' => array(
-			'friendly_name' => __('Enable On-demand RRD Updating'),
-			'description' => __('Should Boost enable on demand RRD updating in Cacti?  If you disable, this change will not take effect until after the next polling cycle.'),
-			'method' => 'checkbox',
-			'default' => ''
-			),
-		'boost_rrd_update_system_enable' => array(
-			'friendly_name' => __('System Level RRD Updater'),
-			'description' => __('Before RRD On-demand Update Can be Cleared, a poller run must always pass'),
-			'method' => 'hidden',
-			'default' => ''
-			),
-		'boost_rrd_update_interval' => array(
-			'friendly_name' => __('How Often Should Boost Update All RRDs'),
-			'description' => __('When you enable boost, your RRD files are only updated when they are requested by a user, or when this time period elapses.'),
-			'default' => '60',
-			'method' => 'drop_array',
-			'default' => '60',
-			'array' => $boost_refresh_interval
-			),
-		'boost_rrd_update_max_records' => array(
-			'friendly_name' => __('Maximum Records'),
-			'description' => __('If the boost output table exceeds this size, in records, an update will take place.'),
-			'method' => 'textbox',
-			'default' => '1000000',
-			'max_length' => '20',
-			'size' => '10'
-			),
-		'boost_rrd_update_max_records_per_select' => array(
-			'friendly_name' => __('Maximum Data Source Items Per Pass'),
-			'description' => __('To optimize performance, the boost RRD updater needs to know how many Data Source Items should be retrieved in one pass.  Please be careful not to set too high as graphing performance during major updates can be compromised.  If you encounter graphing or polling slowness during updates, lower this number.  The default value is 50000.'),
-			'method' => 'drop_array',
-			'default' => '50000',
-			'array' => $boost_max_rows_per_select
-			),
-		'boost_rrd_update_string_length' => array(
-			'friendly_name' => __('Maximum Argument Length'),
-			'description' => __('When boost sends update commands to RRDtool, it must not exceed the operating systems Maximum Argument Length.  This varies by operating system and kernel level.  For example: Windows 2000 <= 2048, FreeBSD <= 65535, Linux 2.6.22-- <= 131072, Linux 2.6.23++ unlimited'),
-			'method' => 'textbox',
-			'default' => '2000',
-			'max_length' => '20',
-			'size' => '10'
-			),
-		'boost_poller_mem_limit' => array(
-			'friendly_name' => __('Memory Limit for Boost and Poller'),
-			'description' => __('The maximum amount of memory for the Cacti Poller and Boosts Poller'),
-			'method' => 'drop_array',
-			'default' => '1024',
-			'array' => $boost_max_memory
-			),
-		'boost_rrd_update_max_runtime' => array(
-			'friendly_name' => __('Maximum RRD Update Script Run Time'),
-			'description' => __('The maximum boot poller run time allowed prior to boost issuing warning messages relative to possible hardware/software issues preventing proper updates.'),
-			'method' => 'drop_array',
-			'default' => '1200',
-			'array' => $boost_max_runtime
-			),
-		'boost_redirect' => array(
-			'friendly_name' => __('Enable direct population of poller_output_boost table'),
-			'description' => __('Enables direct insert of records into poller output boost with results in a 25% time reduction in each poll cycle.'),
-			'method' => 'checkbox',
-			'default' => ''
-			),
-		'boost_png_header' => array(
-			'friendly_name' => __('Image Caching'),
-			'method' => 'spacer',
-			'collapsible' => 'true'
-			),
-		'boost_png_cache_enable' => array(
-			'friendly_name' => __('Enable Image Caching'),
-			'description' => __('Should image caching be enabled?'),
-			'method' => 'checkbox',
-			'default' => ''
-			),
-		'boost_png_cache_directory' => array(
-			'friendly_name' => __('Location for Image Files'),
-			'description' => __('Specify the location where Boost should place your image files.  These files will be automatically purged by the poller when they expire.'),
-			'method' => 'dirpath',
-			'max_length' => '255',
-			'default' => $config['base_path'] . '/cache/boost/'
-			),
-		'boost_process_header' => array(
-			'friendly_name' => __('Process Interlocking'),
-			'collapsible' => 'true',
-			'method' => 'spacer',
-			),
-		'path_boost_log' => array(
-			'friendly_name' => __('Boost Debug Log'),
-			'description' => __('If this field is non-blank, Boost will log RRDupdate output from the boost	poller process.'),
-			'method' => 'filepath',
-			'default' => '',
-			'max_length' => '255'
-			)
-		),
-	'storage' => array(
-		'general_header' => array(
-			'friendly_name' => __('General'),
+		'storage_header' => array(
+			'friendly_name' => __('Data Storage Settings'),
 			'method' => 'spacer',
 			'collapsible' => 'true'
 			),
@@ -1598,11 +1956,13 @@ $settings = array(
 			'description' => __('Choose if RRDs will be stored locally or being handled by an external RRDtool proxy server.'),
 			'method' => 'drop_array',
 			'default' => 0,
-			'array' => array ( __('Local'), __('RRDtool Proxy Server') ),
+			'array' => array (
+				__('Local'),
+				__('RRDtool Proxy Server'))
 			),
 		'extended_paths' => array(
-			'friendly_name' => __('Structured RRD Path (/host_id/local_data_id.rrd)'),
-			'description' => __('Use a separate subfolder for each hosts RRD files.'),
+			'friendly_name' => __('Structured RRD Paths'),
+			'description' => __('Use a separate subfolder for each hosts RRD files.  The naming of the RRDfiles will be &lt;path_cacti&gt;/rra/host_id/local_data_id.rrd.'),
 			'method' => 'checkbox'
 			),
 		'rrdp_header' => array(
@@ -1676,14 +2036,19 @@ $settings = array(
 			'description' => __('There are two removal methods.  The first, Standard Deviation, will remove any sample that is X number of standard deviations away from the average of samples.  The second method, Variance, will remove any sample that is X% more than the Variance average.  The Variance method takes into account a certain number of \'outliers\'.  Those are exceptional samples, like the spike, that need to be excluded from the Variance Average calculation.'),
 			'method' => 'drop_array',
 			'default' => '2',
-			'array' => array(1 => __('Standard Deviation'), 2 => __('Variance Based w/Outliers Removed'))
+			'array' => array(
+				1 => __('Standard Deviation'),
+				2 => __('Variance Based w/Outliers Removed'))
 			),
 		'spikekill_avgnan' => array(
 			'friendly_name' => __('Replacement Method'),
-			'description' => __('There are three replacement methods.  The first method replaces the spike with the the average of the data source in question.  The second method replaces the spike with a \'NaN\'.  The last replaces the spike with the last known good value found.'),
+			'description' => __('There are three replacement methods.  The first method replaces the spike with the average of the data source in question.  The second method replaces the spike with a \'NaN\'.  The last replaces the spike with the last known good value found.'),
 			'method' => 'drop_array',
 			'default' => 'last',
-			'array' => array('avg' => __('Average'), 'nan' => __('NaN\'s'), 'last' => __('Last Known Good'))
+			'array' => array(
+				'avg'  => __('Average'),
+				'nan'  => __('NaN\'s'),
+				'last' => __('Last Known Good'))
 			),
 		'spikekill_deviations' => array(
 			'friendly_name' => __('Number of Standard Deviations'),
@@ -1705,7 +2070,7 @@ $settings = array(
 			),
 		'spikekill_percent' => array(
 			'friendly_name' => __('Variance Percentage'),
-			'description' => __('This value represents the percentage above the adjusted sample average once outliers have been removed from the sample.  For example, a Variance Percentage of 100% on an adjusted average of 50 would remove any sample above the quantity of 100 from the graph.'),
+			'description' => __('This value represents the percentage above the adjusted sample average once outliers have been removed from the sample.  For example, a Variance Percentage of 100%% on an adjusted average of 50 would remove any sample above the quantity of 100 from the graph.'),
 			'method' => 'drop_array',
 			'default' => '1000',
 			'array' => array(
@@ -1757,8 +2122,7 @@ $settings = array(
 			),
 		'spikekill_backupdir' => array(
 			'friendly_name' => __('RRDfile Backup Directory'),
-			'description' => __('If this directory is not empty, then your original RRDfiles will be backed
-			up to this location.'),
+			'description' => __('If this directory is not empty, then your original RRDfiles will be backed up to this location.'),
 			'method' => 'dirpath',
 			'default' => $config['base_path'] . '/cache/spikekill/',
 			'max_length' => '255',
@@ -1771,8 +2135,7 @@ $settings = array(
 			),
 		'spikekill_batch' => array(
 			'friendly_name' => __('Removal Schedule'),
-			'description' => __('Do you wish to periodically remove spikes from your graphs?  If so, select the frequency
-			below.'),
+			'description' => __('Do you wish to periodically remove spikes from your graphs?  If so, select the frequency below.'),
 			'method' => 'drop_array',
 			'default' => '0',
 			'array' => array(
@@ -1780,8 +2143,7 @@ $settings = array(
 				6  => __('Every %d Hours', 6),
 				12 => __('Every %d Hours', 12),
 				24 => __('Once a Day'),
-				48 => __('Every Other Day')
-				)
+				48 => __('Every Other Day'))
 			),
 		'spikekill_basetime' => array(
 			'friendly_name' => __('Base Time'),
@@ -1796,7 +2158,15 @@ $settings = array(
 			'method' => 'drop_multi',
 			'description' => __('When performing batch spike removal, only the templates selected below will be acted on.'),
 			'array' => $spikekill_templates,
-            )
+            ),
+		'spikekill_purge' => array(
+			'friendly_name' => __('Backup Retention'),
+			'description' => __('When SpikeKill kills spikes in graphs, it makes a backup of the RRDfile.  How long should these backup files be retained?'),
+			'method' => 'drop_array',
+			'default' => '7856352',
+			'none_value' => __('Never'),
+			'array' => $timespans
+			)
 		)
 	);
 
@@ -1806,7 +2176,7 @@ $settings_user = array(
 			'friendly_name' => __('Theme'),
 			'description' => __('Please select one of the available Themes to skin your Cacti with.'),
 			'method' => 'drop_array',
-			'default' => 'classic',
+			'default' => read_config_option('selected_theme'),
 			'array' => $themes
 			),
 		'default_view_mode' => array(
@@ -1816,13 +2186,13 @@ $settings_user = array(
 			'array' => $graph_views,
 			'default' => '1'
 			),
-        'user_language' => array(
-            'friendly_name' => __('User Language'),
-            'description' => __('Defines the preferred GUI language.'),
-            'method' => 'drop_array',
-            'default' => 'us',
-            'array' => get_installed_locales()
-            ),
+		'user_language' => array(
+			'friendly_name' => __('User Language'),
+			'description' => __('Defines the preferred GUI language.'),
+			'method' => 'drop_language',
+			'default' => get_new_user_default_language(),
+			'array' => get_installed_locales()
+		),
 		'show_graph_title' => array(
 			'friendly_name' => __('Show Graph Title'),
 			'description' => __('Display the graph title on the page so that it may be searched using the browser.'),
@@ -1831,7 +2201,13 @@ $settings_user = array(
 			),
 		'hide_disabled' => array(
 			'friendly_name' => __('Hide Disabled'),
-			'description' => __('Hide Disabled Devices and Graphs from Disabled Devices.'),
+			'description' => __('Hides Disabled Devices and Graphs when viewing outside of Console tab.'),
+			'method' => 'checkbox',
+			'default' => 'on'
+			),
+		'show_aggregates' => array(
+			'friendly_name' => __('Show Device Aggregates'),
+			'description' => __('If a Device Data Source is included in an Aggregate Graph, show that Graph along with other Device Graphs'),
 			'method' => 'checkbox',
 			'default' => 'on'
 			),
@@ -1840,21 +2216,26 @@ $settings_user = array(
 			'description' => __('The date format to use in Cacti.'),
 			'method' => 'drop_array',
 			'array' => $dateformats,
-			'default' => GD_Y_MO_D
+			'default' => read_config_option('default_date_format')
 			),
 		'default_datechar' => array(
 			'friendly_name' => __('Date Separator'),
 			'description' => __('The date separator to be used in Cacti.'),
 			'method' => 'drop_array',
 			'array' => $datechar,
-			'default' => GDC_SLASH
+			'default' => read_config_option('default_datechar')
 			),
 		'page_refresh' => array(
 			'friendly_name' => __('Page Refresh'),
 			'description' => __('The number of seconds between automatic page refreshes.'),
 			'method' => 'drop_array',
 			'default' => '300',
-			'array' => array( '15' => __('%d Seconds', 15), '20' => __('%d Seconds', 20), '30' => __('%d Seconds', 30), '60' => __('1 Minute'), '300' => __('%d Minutes', 5) )
+			'array' => array(
+				'15'  => __('%d Seconds', 15),
+				'20'  => __('%d Seconds', 20),
+				'30'  => __('%d Seconds', 30),
+				'60'  => __('1 Minute'),
+				'300' => __('%d Minutes', 5))
 			),
 		'preview_graphs_per_page' => array(
 			'friendly_name' => __('Preview Graphs Per Page'),
@@ -1873,15 +2254,15 @@ $settings_user = array(
 			'default' => '1'
 			),
 		'default_timespan' => array(
-			'friendly_name' => __('Default Graph View Timespan'),
-			'description' => __('The default timespan you wish to be displayed when you display graphs'),
+			'friendly_name' => __('Default Timespan'),
+			'description' => __('The default Timespan displayed when viewing Graphs and other time specific data.'),
 			'method' => 'drop_array',
 			'array' => $graph_timespans,
 			'default' => GT_LAST_DAY
 			),
 		'default_timeshift' => array(
-			'friendly_name' => __('Default Graph View Timeshift'),
-			'description' => __('The default timeshift you wish to be displayed when you display graphs'),
+			'friendly_name' => __('Default Timeshift'),
+			'description' => __('The default Timeshift displayed when viewing Graphs and other time specific data.'),
 			'method' => 'drop_array',
 			'array' => $graph_timeshifts,
 			'default' => GTS_1_DAY
@@ -1891,7 +2272,7 @@ $settings_user = array(
 			'description' => __('When displaying Graphs, allow Graph Dates to extend \'to future\''),
 			'method' => 'checkbox',
 			'default' => 'on'
-		),
+			),
 		'first_weekdayid' => array(
 			'friendly_name' => __('First Day of the Week'),
 			'description' => __('The first Day of the Week for weekly Graph Displays'),
@@ -1937,14 +2318,26 @@ $settings_user = array(
 			'description' => __('The number of columns to use when displaying Thumbnail graphs in Preview mode.'),
 			'method' => 'drop_array',
 			'default' => '2',
-			'array' => array('1' => __('1 Column'),'2' => __('%d Columns', 2), '3' => __('%d Columns', 3), '4' => __('%d Columns', 4), '5' => __('%d Columns', 5), '6' => __('%d Columns', 6) )
+			'array' => array(
+				'1' => __('1 Column'),
+				'2' => __('%d Columns', 2),
+				'3' => __('%d Columns', 3),
+				'4' => __('%d Columns', 4),
+				'5' => __('%d Columns', 5),
+				'6' => __('%d Columns', 6))
 			),
 		'num_columns_tree' => array(
 			'friendly_name' => __('Tree View Thumbnail Columns'),
 			'description' => __('The number of columns to use when displaying Thumbnail graphs in Tree mode.'),
 			'method' => 'drop_array',
 			'default' => '2',
-			'array' => array('1' => __('1 Column'),'2' => __('%d Columns', 2), '3' => __('%d Columns', 3), '4' => __('%d Columns', 4), '5' => __('%d Columns', 5), '6' => __('%d Columns', 6) )
+			'array' => array(
+				'1' => __('1 Column'),
+				'2' => __('%d Columns', 2),
+				'3' => __('%d Columns', 3),
+				'4' => __('%d Columns', 4),
+				'5' => __('%d Columns', 5),
+				'6' => __('%d Columns', 6))
 			),
 		'default_height' => array(
 			'friendly_name' => __('Thumbnail Height'),
@@ -1983,6 +2376,28 @@ $settings_user = array(
 			'description' => __('Choose whether to expand the Graph Templates and Data Queries used by a Device on Tree.'),
 			'method' => 'checkbox',
 			'default' => ''
+			),
+		'tree_history' => array(
+			'friendly_name' => __('Tree History'),
+			'description' => __('If enabled, Cacti will remember your Tree History between logins and when you return to the Graphs page.'),
+			'method' => 'checkbox',
+			'default' => 'on'
+			),
+		'min_tree_width' => array(
+			'friendly_name' => __('Minimum Tree Width'),
+			'description' => __('The Minimum width of the Tree to contract to.'),
+			'method' => 'textbox',
+			'default' => read_config_option('min_tree_width'),
+			'max_length' => '5',
+			'size' => '7'
+			),
+		'max_tree_width' => array(
+			'friendly_name' => __('Maximum Tree Width'),
+			'description' => __('The Maximum width of the Tree to expand to, after which time, Tree branches will scroll on the page.'),
+			'method' => 'textbox',
+			'default' => read_config_option('max_tree_width'),
+			'max_length' => '5',
+			'size' => '7'
 			)
 		),
 	'fonts' => array(
@@ -2047,6 +2462,24 @@ $settings_user = array(
 			)
 		)
 	);
+
+if ($config['cacti_server_os'] == 'win32') {
+	unset($settings['mail']['settings_sendmail_header']);
+	unset($settings['mail']['settings_sendmail_path']);
+}
+
+if (is_realm_allowed(25)) {
+	$settings_user['general']['realtime_mode'] = array(
+		'friendly_name' => __('Realtime View Mode'),
+		'description' => __('How do you wish to view Realtime Graphs?'),
+		'method' => 'drop_array',
+		'array' => array(
+			'1' => __('Inline'),
+			'2' => __('New Window')
+		),
+		'default' => '1'
+	);
+}
 
 api_plugin_hook('config_settings');
 

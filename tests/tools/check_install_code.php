@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -29,14 +29,17 @@
 // report all the errors
 error_reporting(E_ALL);
 
-// setup global expection tracking array
-$global_exception = array();
+// set error handler
+set_error_handler('error_handler');
 
 // allow infinite execute
 ini_set('max_execution_time', '0');
 
 // define base path of Cacti
 define('CACTI_PATH', str_replace('/tests/tools', '', dirname(__FILE__)));
+
+global $config;
+$config = array('base_path' => CACTI_PATH);
 
 // pre-flush oubput buffer to avoid header warning
 flush();
@@ -68,3 +71,16 @@ while (($file = readdir($dh)) !== false)
 closedir($dh);
 
 exit(0);
+
+/*
+ * Error handler function to cause exception on error and warnings
+ */
+function error_handler($err_number, $err_string, $err_file, $err_line) {
+	$msg = $err_string . " in " . $err_file . " on line " . $err_line;
+
+	if ($err_number == E_NOTICE || $err_number == E_WARNING) {
+		throw new ErrorException($msg, $err_number);
+	} else {
+		echo $msg;
+	}
+}

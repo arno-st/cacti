@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -24,29 +24,17 @@
 
 function upgrade_to_0_8_7c() {
 	/* speed up the UI, missed in 0.8.7b upgrade, avoid failures if index already exists */
-	$result = db_fetch_assoc("SHOW INDEX FROM `data_local`");
-	$indices = array();
-	foreach($result as $index => $arr) {
-		$indices[] = $arr["Key_name"];
-	}
-	if (!in_array('host_id', $indices)) {
-		db_install_execute("ALTER TABLE `data_local` ADD INDEX `host_id`(`host_id`)");
+	db_install_add_key('data_local', 'index', 'host_id', array('host_id'));
+	if (db_column_exists('host_snmp_cache', 'field_name')) {
+		db_install_add_key('host_snmp_cache', 'index', 'field_name', array('field_name'));
 	}
 
-	$result = db_fetch_assoc("SHOW INDEX FROM `host_snmp_cache`");
-	$indices = array();
-	foreach($result as $index => $arr) {
-		$indices[] = $arr["Key_name"];
-	}
-	if (!in_array('field_name', $indices)) {
-		db_install_execute("ALTER TABLE `host_snmp_cache` ADD INDEX `field_name`(`field_name`)");
-	}
-	if (!in_array('field_value', $indices)) {
-		db_install_execute("ALTER TABLE `host_snmp_cache` ADD INDEX `field_value`(`field_value`)");
+	if (db_column_exists('host_snmp_cache', 'field_value')) {
+		db_install_add_key('host_snmp_cache', 'index', 'field_value', array('field_value'));
 	}
 
 	/* speed up graph automations some more */
-	db_install_execute("ALTER TABLE `data_input_fields` ADD INDEX `input_output`(`input_output`)");
+	db_install_add_key('data_input_fields', 'index', 'input_output', 'input_output');
 
 	/* increase the width of the settings field, but only if MySQL is >= 5 */
 	if (substr(db_fetch_cell("SELECT @@version"), 0, 1) >= 5) {
@@ -76,7 +64,7 @@ function upgrade_to_0_8_7c() {
 	db_install_execute("ALTER TABLE `poller_time` MODIFY COLUMN `pid` INT(11) UNSIGNED NOT NULL DEFAULT '0';");
 
 	/* Update deletion verification setting */
-	db_install_execute("UPDATE settings SET name = 'deletion_verification' WHERE name = 'remove_verification'");
+	db_install_swap_setting('remove_verification', 'deletion_verification');
 
 	/* Correct issue where rrd_next_step goes large in a positive way instead of the way it should go */
 	db_install_execute("ALTER TABLE `poller_item` MODIFY COLUMN `rrd_step` MEDIUMINT(8) NOT NULL DEFAULT 300");

@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -25,18 +25,41 @@
 include_once('./include/global.php');
 
 $page = db_fetch_row_prepared('SELECT
-	id, title, style, contentfile, enabled
+	id, title, style, contentfile, enabled, refresh
 	FROM external_links AS el
 	WHERE id = ?',
 	array(get_filter_request_var('id')));
 
-if (!sizeof($page)) {
-	print 'FATAL: Page is not defined.';
+// Prevent redirect loops
+if (isset($_SERVER['HTTP_REFERER'])) {
+	if (strpos($_SERVER['HTTP_REFERER'], 'link.php') === false) {
+		$referer = sanitize_uri($_SERVER['HTTP_REFERER']);
+		$_SESSION['link_referer'] = $referer;
+	} elseif (isset($_SESSION['link_referer'])) {
+		$referer = sanitize_uri($_SESSION['link_referer']);
+	} else {
+		$referer = 'index.php';
+	}
+} elseif (isset($_SESSION['link_referer'])) {
+	$referer = sanitize_uri($_SESSION['link_referer']);
+} else {
+	$referer = 'index.php';
+}
+
+if (!cacti_sizeof($page)) {
+	raise_message('page_not_defined');
+	header('Location: ' . $referer);
+	exit;
 } else {
 	global $link_nav;
 
 	if (is_realm_allowed($page['id']+10000)) {
 		unset ($refresh);
+
+		if (!empty($page['refresh'])) {
+			$refresh['seconds'] = $page['refresh'];
+			$refresh['page']    = $config['url_path'] . 'link.php?id=' . get_request_var('id');
+		}
 
 		if ($page['style'] == 'TAB') {
 			$link_nav['link.php:']['title']   = $page['title'];
@@ -63,10 +86,12 @@ if (!sizeof($page)) {
 
 			print '</div>';
 		}
-	} else {
-		print 'ERROR: Page is not authorized.';
-	}
 
-	bottom_footer();
+		bottom_footer();
+	} else {
+		raise_message('permission_denied');
+		header('Location: ' . $referer);
+		exit;
+	}
 }
 

@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -26,6 +26,7 @@
 ob_start();
 
 $guest_account = true;
+$auth_text     = true;
 $gtype = 'png';
 
 include('./include/auth.php');
@@ -76,15 +77,15 @@ if (!isset_request_var('image_format')) {
 
 $graph_data_array['image_format'] = $gtype;
 
-session_write_close();
+cacti_session_close();
 
 /* override: graph start time (unix time) */
-if (!isempty_request_var('graph_start') && get_request_var('graph_start') < 1600000000) {
+if (!isempty_request_var('graph_start') && get_request_var('graph_start') < FILTER_VALIDATE_MAX_DATE_AS_INT) {
 	$graph_data_array['graph_start'] = get_request_var('graph_start');
 }
 
 /* override: graph end time (unix time) */
-if (!isempty_request_var('graph_end') && get_request_var('graph_end') < 1600000000) {
+if (!isempty_request_var('graph_end') && get_request_var('graph_end') < FILTER_VALIDATE_MAX_DATE_AS_INT) {
 	$graph_data_array['graph_end'] = get_request_var('graph_end');
 }
 
@@ -103,7 +104,7 @@ if (!isempty_request_var('graph_nolegend')) {
 	$graph_data_array['graph_nolegend'] = get_request_var('graph_nolegend');
 }
 
-/* print RRDTool graph source? */
+/* print RRDtool graph source? */
 if (!isempty_request_var('show_source')) {
 	$graph_data_array['print_source'] = get_request_var('show_source');
 }
@@ -128,7 +129,8 @@ if (isset_request_var('rra_id')) {
 	$rra_id = null;
 }
 
-$output = rrdtool_function_graph(get_request_var('local_graph_id'), $rra_id, $graph_data_array);
+$null_param = array();
+$output = rrdtool_function_graph(get_request_var('local_graph_id'), $rra_id, $graph_data_array, '', $null_param, $_SESSION['sess_user_id']);
 
 if ($output !== false && $output != '') {
 	/* flush the headers now */
@@ -141,9 +143,14 @@ if ($output !== false && $output != '') {
 
 	/* get the error string */
 	$graph_data_array['get_error'] = true;
-	rrdtool_function_graph(get_request_var('local_graph_id'), $rra_id, $graph_data_array);
+	$null_param = array();
+	rrdtool_function_graph(get_request_var('local_graph_id'), $rra_id, $graph_data_array, '', $null_param, $_SESSION['sess_user_id']);
 
 	$error = ob_get_contents();
+
+	if (read_config_option('stats_poller') == '') {
+		$error = __('The Cacti Poller has not run yet.');
+	}
 
 	if (isset($graph_data_array['graph_width']) && isset($graph_data_array['graph_height'])) {
 		$image = rrdtool_create_error_image($error, $graph_data_array['graph_width'], $graph_data_array['graph_height']);

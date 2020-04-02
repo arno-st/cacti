@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -35,12 +35,13 @@ function upgrade_to_0_8_5() {
 	db_install_execute("UPDATE data_template_data set name = REPLACE(name,'ifDesc','ifDescr') where data_template_id=40;");
 	db_install_execute("UPDATE data_template_data set name = REPLACE(name,'ifDesc','ifDescr') where data_template_id=41;");
 
-	$data_templates = db_fetch_assoc("select id from data_template_data where (data_template_id=1 or data_template_id=2 or data_template_id=38 or data_template_id=39 or data_template_id=40 or data_template_id=41);");
+	$data_templates_results = db_install_fetch_assoc("select id from data_template_data where (data_template_id=1 or data_template_id=2 or data_template_id=38 or data_template_id=39 or data_template_id=40 or data_template_id=41);");
+	$data_templates         = $data_templates_results['data'];
 
-	if (sizeof($data_templates) > 0) {
-	foreach ($data_templates as $item) {
-		db_install_execute("UPDATE data_input_data set value='ifDescr' where value='ifDesc' and data_template_data_id=" . $item["id"] . ";");
-	}
+	if (cacti_sizeof($data_templates) > 0) {
+		foreach ($data_templates as $item) {
+			db_install_execute("UPDATE data_input_data set value='ifDescr' where value='ifDesc' and data_template_data_id=?",array($item["id"]));
+		}
 	}
 
 	db_install_execute("UPDATE graph_templates_graph set title = REPLACE(title,'ifDesc','ifDescr') where graph_template_id=22;");
@@ -53,7 +54,9 @@ function upgrade_to_0_8_5() {
 	db_install_execute("UPDATE graph_templates_graph set title = REPLACE(title,'ifDesc','ifDescr') where graph_template_id=33;");
 	db_install_execute("UPDATE graph_templates_graph set title = REPLACE(title,'ifDesc','ifDescr') where graph_template_id=23;");
 
-	db_install_execute("CREATE TABLE `host_graph` (`host_id` mediumint(8) unsigned NOT NULL default '0', `graph_template_id` mediumint(8) unsigned NOT NULL default '0', PRIMARY KEY  (`host_id`,`graph_template_id`)) TYPE=MyISAM;");
+	if (!db_table_exists('host_graph')) {
+		db_install_execute("CREATE TABLE `host_graph` (`host_id` mediumint(8) unsigned NOT NULL default '0', `graph_template_id` mediumint(8) unsigned NOT NULL default '0', PRIMARY KEY  (`host_id`,`graph_template_id`))");
+	}
 
 	/* typo */
 	db_install_execute("UPDATE settings set name='snmp_version' where name='smnp_version';");

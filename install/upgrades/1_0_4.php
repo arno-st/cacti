@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,5 +23,5 @@
 */
 
 function upgrade_to_1_0_4() {
-	db_install_execute('ALTER TABLE poller_output_boost DROP PRIMARY KEY, ADD PRIMARY KEY(`local_data_id`, `time`, `rrd_name`) USING BTREE');
+	db_install_add_key('poller_output_boost', 'KEY', 'PRIMARY', array('local_data_id', 'time', 'rrd_name'), 'BTREE');
 }

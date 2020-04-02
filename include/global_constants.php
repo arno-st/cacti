@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -22,9 +22,13 @@
  +-------------------------------------------------------------------------+
 */
 
+define('CACTI_PHP_VERSION_MINIMUM', '5.4.0');
+
+define('CACTI_DEV_VERSION','1.3.0.99.1554297766');
+
 define('CACTI_ESCAPE_CHARACTER', '"');
-define('COPYRIGHT_YEARS', 'Copyright (C) 2004-2017 The Cacti Group');
-define('COPYRIGHT_YEARS_SHORT', '(c) 2004-2017 - The Cacti Group');
+define('COPYRIGHT_YEARS', 'Copyright (C) 2004-' . date('Y') . ' The Cacti Group');
+define('COPYRIGHT_YEARS_SHORT', '(c) 2004-' . date('Y') . ' - The Cacti Group');
 
 define('HOST_GROUPING_GRAPH_TEMPLATE', 1);
 define('HOST_GROUPING_DATA_QUERY_INDEX', 2);
@@ -44,11 +48,7 @@ define('RRDTOOL_OUTPUT_STDOUT', 1);
 define('RRDTOOL_OUTPUT_STDERR', 2);
 define('RRDTOOL_OUTPUT_GRAPH_DATA', 3);
 define('RRDTOOL_OUTPUT_BOOLEAN', 4);
-
-define('RRD_VERSION_1_3', 'rrd-1.3.x');
-define('RRD_VERSION_1_4', 'rrd-1.4.x');
-define('RRD_VERSION_1_5', 'rrd-1.5.x');
-define('RRD_VERSION_1_6', 'rrd-1.6.x');
+define('RRDTOOL_OUTPUT_RETURN_STDERR', 5);
 
 define('RRD_FONT_RENDER_NORMAL',  'normal');
 define('RRD_FONT_RENDER_LIGHT',   'light');
@@ -109,6 +109,7 @@ define('GRAPH_ITEM_TYPE_TEXTALIGN',         40);
 define('POLLER_ACTION_SNMP', 0);
 define('POLLER_ACTION_SCRIPT', 1);
 define('POLLER_ACTION_SCRIPT_PHP', 2);
+
 /* used for reindexing only:
  * in case we do not have OID_NUM_INDEXES|ARG_NUM_INDEXES
  * we simply use the OID_INDEX|ARG_INDEX and count number of indexes found
@@ -120,6 +121,7 @@ define('POLLER_ACTION_SCRIPT_PHP_COUNT', 12);
 
 define('POLLER_COMMAND_REINDEX', 1);
 define('POLLER_COMMAND_RRDPURGE', 2);
+define('POLLER_COMMAND_PURGE', 3);
 
 define('POLLER_VERBOSITY_NONE', 1);
 define('POLLER_VERBOSITY_LOW', 2);
@@ -127,6 +129,14 @@ define('POLLER_VERBOSITY_MEDIUM', 3);
 define('POLLER_VERBOSITY_HIGH', 4);
 define('POLLER_VERBOSITY_DEBUG', 5);
 define('POLLER_VERBOSITY_DEVDBG', 6);
+
+define('POLLER_STATUS_NEW', 0);
+define('POLLER_STATUS_RUNNING', 1);
+define('POLLER_STATUS_IDLE', 2);
+define('POLLER_STATUS_DOWN', 3);
+define('POLLER_STATUS_DISABLED', 4);
+define('POLLER_STATUS_RECOVERING', 5);
+define('POLLER_STATUS_HEARTBEAT', 6);
 
 define('AVAIL_NONE', 0);
 define('AVAIL_SNMP_AND_PING', 1);
@@ -139,6 +149,7 @@ define('AVAIL_SNMP_GET_NEXT', 6);
 define('PING_ICMP', 1);
 define('PING_UDP', 2);
 define('PING_TCP', 3);
+define('PING_SNMP', 4);
 
 define('HOST_UNKNOWN', 0);
 define('HOST_DOWN', 1);
@@ -303,7 +314,6 @@ define('REPORTS_TREE_NONE', 0);
 define('REPORTS_TIMESPAN_DEFAULT', GT_LAST_DAY);
 
 define('REPORTS_EXTENSION_GD', 'gd');
-define('REPORTS_DEBUG', read_config_option('reports_log_verbosity'), true);
 
 define('REPORTS_OUTPUT_STDOUT', 1);
 define('REPORTS_OUTPUT_EMAIL',  2);
@@ -311,8 +321,11 @@ define('REPORTS_OUTPUT_EMAIL',  2);
 define('REPORTS_DEFAULT_MAX_SIZE', 10485760);
 
 # unless a hook for 'global_constants' is available, all DEFINEs go here
-define('AGGREGATE_GRAPH_TYPE_KEEP', 0);
+define('AGGREGATE_GRAPH_TYPE_KEEP',          0);
 define('AGGREGATE_GRAPH_TYPE_KEEP_STACKED', 50);
+define('AGGREGATE_GRAPH_TYPE_LINE1_STACK',  51);
+define('AGGREGATE_GRAPH_TYPE_LINE2_STACK',  52);
+define('AGGREGATE_GRAPH_TYPE_LINE3_STACK',  53);
 
 define('AGGREGATE_TOTAL_NONE', 1);
 define('AGGREGATE_TOTAL_ALL', 2);
@@ -324,6 +337,7 @@ define('AGGREGATE_TOTAL_TYPE_ALL', 2);
 define('AGGREGATE_ORDER_NONE', 1);
 define('AGGREGATE_ORDER_DS_GRAPH', 2);
 define('AGGREGATE_ORDER_GRAPH_DS', 3);
+define('AGGREGATE_ORDER_BASE_GRAPH', 4);
 
 define('AUTOMATION_OP_NONE', 0);
 define('AUTOMATION_OP_CONTAINS', 1);
@@ -370,7 +384,7 @@ define('AUTOMATION_ACTION_TREE_ENABLE', 2);
 define('AUTOMATION_ACTION_TREE_DISABLE', 3);
 define('AUTOMATION_ACTION_TREE_DELETE', 99);
 
-if ($database_type == 'mysql') {
+if (isset($database_type) && $database_type == 'mysql') {
 	define('SQL_NO_CACHE', 'SQL_NO_CACHE');
 } else {
 	define('SQL_NO_CACHE', '');
@@ -379,9 +393,10 @@ if ($database_type == 'mysql') {
 define('MAX_DISPLAY_PAGES', 5);
 define('CHECKED', 'on');
 
-define('FILTER_VALIDATE_IS_REGEX',          99999);
-define('FILTER_VALIDATE_IS_NUMERIC_ARRAY', 100000);
-define('FILTER_VALIDATE_IS_NUMERIC_LIST',  100001);
+define('FILTER_VALIDATE_MAX_DATE_AS_INT', 2088385563);
+define('FILTER_VALIDATE_IS_REGEX',             99999);
+define('FILTER_VALIDATE_IS_NUMERIC_ARRAY',    100000);
+define('FILTER_VALIDATE_IS_NUMERIC_LIST',     100001);
 
 /* socket errors */
 define('ENOTSOCK',        88);
@@ -415,3 +430,41 @@ define('EINPROGRESS',     115);
 define('EREMOTEIO',       121);
 define('ECANCELED',       125);
 
+define('DB_STATUS_ERROR'  , 0);
+define('DB_STATUS_WARNING', 1);
+define('DB_STATUS_SUCCESS', 2);
+define('DB_STATUS_SKIPPED', 3);
+
+define('MESSAGE_LEVEL_NONE',  0);
+define('MESSAGE_LEVEL_INFO',  1);
+define('MESSAGE_LEVEL_WARN',  2);
+define('MESSAGE_LEVEL_ERROR', 3);
+define('MESSAGE_LEVEL_CSRF',  4);
+define('MESSAGE_LEVEL_MIXED', 5);
+
+if (!defined('PASSWORD_DEFAULT')) {
+	define('PASSWORD_DEFAULT', 1);
+}
+
+define('CACTI_MAIL_PHP', 0);
+define('CACTI_MAIL_SENDMAIL', 1);
+define('CACTI_MAIL_SMTP', 2);
+
+define('DAYS_FORMAT_SHORT', 0);
+define('DAYS_FORMAT_MEDIUM', 1);
+define('DAYS_FORMAT_MEDIUM_LOG', 2);
+define('DAYS_FORMAT_LONG', 3);
+define('DAYS_FORMAT_LONG_LOG', 4);
+
+define('GRAPH_SOURCE_PLAIN', 0);
+define('GRAPH_SOURCE_DATA_QUERY', 1);
+define('GRAPH_SOURCE_TEMPLATE', 2);
+define('GRAPH_SOURCE_AGGREGATE', 3);
+
+define('CACTI_VERSION_FORMAT_SHORT', 0);
+define('CACTI_VERSION_FORMAT_FULL', 1);
+
+define('CACTI_LANGUAGE_HANDLER_NONE', 0);
+define('CACTI_LANGUAGE_HANDLER_PHPGETTEXT', 1);
+define('CACTI_LANGUAGE_HANDLER_OSCAROTERO', 2);
+define('CACTI_LANGUAGE_HANDLER_MOTRANSLATOR', 3);

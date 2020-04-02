@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -43,17 +43,17 @@ get_filter_request_var('stdout');
 /* flush the headers now */
 ob_end_clean();
 
-session_write_close();
+cacti_session_close();
 
 $graph_data_array = array();
 
 /* override: graph start time (unix time) */
-if (!isempty_request_var('graph_start') && is_numeric(get_request_var('graph_start')) && get_request_var('graph_start') < 1600000000) {
+if (!isempty_request_var('graph_start') && is_numeric(get_request_var('graph_start')) && get_request_var('graph_start') < FILTER_VALIDATE_MAX_DATE_AS_INT) {
 	$graph_data_array['graph_start'] = get_request_var('graph_start');
 }
 
 /* override: graph end time (unix time) */
-if (!isempty_request_var('graph_end') && is_numeric(get_request_var('graph_end')) && get_request_var('graph_end') < 1600000000) {
+if (!isempty_request_var('graph_end') && is_numeric(get_request_var('graph_end')) && get_request_var('graph_end') < FILTER_VALIDATE_MAX_DATE_AS_INT) {
 	$graph_data_array['graph_end'] = get_request_var('graph_end');
 }
 
@@ -72,14 +72,14 @@ if (!isempty_request_var('graph_nolegend')) {
 	$graph_data_array['graph_nolegend'] = get_request_var('graph_nolegend');
 }
 
-/* print RRDTool graph source? */
+/* print RRDtool graph source? */
 if (!isempty_request_var('show_source')) {
 	$graph_data_array['print_source'] = get_request_var('show_source');
 }
 
-$graph_info = db_fetch_row_prepared('SELECT * 
-	FROM graph_templates_graph 
-	WHERE local_graph_id = ?', 
+$graph_info = db_fetch_row_prepared('SELECT *
+	FROM graph_templates_graph
+	WHERE local_graph_id = ?',
 	array(get_request_var('local_graph_id')));
 
 /* for bandwidth, NThPercentile */
@@ -89,7 +89,7 @@ $xport_meta = array();
 $graph_data_array['export_csv'] = true;
 
 /* Get graph export */
-$xport_array = rrdtool_function_xport(get_request_var('local_graph_id'), get_request_var('rra_id'), $graph_data_array, $xport_meta);
+$xport_array = rrdtool_function_xport(get_request_var('local_graph_id'), get_request_var('rra_id'), $graph_data_array, $xport_meta, $_SESSION['sess_user_id']);
 
 /* Make graph title the suggested file name */
 if (is_array($xport_array['meta'])) {
@@ -147,18 +147,17 @@ if (is_array($xport_array['meta']) && isset($xport_array['meta']['start'])) {
 		}
 		print $header . "\n";
 	} else {
-		$second = "align='right' colspan='2'";
-		print "<table align='center' width='100%' style='border: 1px solid #bbbbbb;'><tr><td>\n";
-		print "<table class='cactiTable' align='center' width='100%'>\n";
-		print "<tr class='tableHeader'><td colspan='2' class='linkOverDark' style='font-weight:bold;'>" . __('Summary Details') . "</td><td align='right'><a href='#' role='link' style='cursor:pointer;' class='download linkOverDark' id='graph_" . $xport_array['meta']['local_graph_id'] . "'>Download</a></td></tr>\n";
-		print "<tr class='even'><td align='left'>" . __('Title') . "</td><td $second>"          . html_escape($xport_array['meta']['title_cache'])      . "</td></tr>\n";
-		print "<tr class='odd'><td align='left'>" . __('Vertical Label') . "</td><td $second>" . html_escape($xport_array['meta']['vertical_label'])    . "</td></tr>\n";
-		print "<tr class='even'><td align='left'>" . __('Start Date') . "</td><td $second>"     . date('Y-m-d H:i:s', $xport_array['meta']['start']) . "</td></tr>\n";
-		print "<tr class='odd'><td align='left'>" . __('End Date') . "</td><td $second>"       . date('Y-m-d H:i:s', ($xport_array['meta']['end'] == $xport_array['meta']['start']) ? $xport_array['meta']['start'] + $xport_array['meta']['step']*($xport_array['meta']['rows']-1) : $xport_array['meta']['end']) . "</td></tr>\n";
-		print "<tr class='even'><td align='left'>" . __('Step') . "</td><td $second>"           . $xport_array['meta']['step']                       . "</td></tr>\n";
-		print "<tr class='odd'><td align='left'>" . __('Total Rows') . "</td><td $second>"     . $xport_array['meta']['rows']                        . "</td></tr>\n";
-		print "<tr class='even'><td align='left'>" . __('Graph ID') . "</td><td $second>"       . $xport_array['meta']['local_graph_id']             . "</td></tr>\n";
-		print "<tr class='odd'><td align='left'>" . __('Host ID') . "</td><td $second>"        . $xport_array['meta']['host_id']                     . "</td></tr>\n";
+		$second = "class='right' colspan='2'";
+		print "<table class='cactiTable' class='center'>\n";
+		print "<tr class='tableHeader'><td colspan='2' class='linkOverDark' style='font-weight:bold;'>" . __('Summary Details') . "</td><td class='right'><a href='#' role='link' style='cursor:pointer;' class='download linkOverDark' id='graph_" . $xport_array['meta']['local_graph_id'] . "'>" . __('Download') . "</a></td></tr>\n";
+		print "<tr class='even'><td class='left'>" . __('Title') . "</td><td $second>"          . html_escape($xport_array['meta']['title_cache'])      . "</td></tr>\n";
+		print "<tr class='odd'><td class='left'>" . __('Vertical Label') . "</td><td $second>" . html_escape($xport_array['meta']['vertical_label'])    . "</td></tr>\n";
+		print "<tr class='even'><td class='left'>" . __('Start Date') . "</td><td $second>"     . date('Y-m-d H:i:s', $xport_array['meta']['start']) . "</td></tr>\n";
+		print "<tr class='odd'><td class='left'>" . __('End Date') . "</td><td $second>"       . date('Y-m-d H:i:s', ($xport_array['meta']['end'] == $xport_array['meta']['start']) ? $xport_array['meta']['start'] + $xport_array['meta']['step']*($xport_array['meta']['rows']-1) : $xport_array['meta']['end']) . "</td></tr>\n";
+		print "<tr class='even'><td class='left'>" . __('Step') . "</td><td $second>"           . $xport_array['meta']['step']                       . "</td></tr>\n";
+		print "<tr class='odd'><td class='left'>" . __('Total Rows') . "</td><td $second>"     . $xport_array['meta']['rows']                        . "</td></tr>\n";
+		print "<tr class='even'><td class='left'>" . __('Graph ID') . "</td><td $second>"       . $xport_array['meta']['local_graph_id']             . "</td></tr>\n";
+		print "<tr class='odd'><td class='left'>" . __('Host ID') . "</td><td $second>"        . $xport_array['meta']['host_id']                     . "</td></tr>\n";
 
 		$class = 'even';
 		if (isset($xport_meta['NthPercentile'])) {
@@ -168,7 +167,7 @@ if (is_array($xport_array['meta']) && isset($xport_array['meta']['start'])) {
 				} else {
 					$class = 'even';
 				}
-				print "<tr class='$class'><td>" . __('Nth Percentile') . "</td><td align='left'>" . $item['value'] . "</td><td align='right'>" . $item['format'] . "</td></tr>\n";
+				print "<tr class='$class'><td>" . __('Nth Percentile') . "</td><td class='left'>" . $item['value'] . "</td><td class='right'>" . $item['format'] . "</td></tr>\n";
 			}
 		}
 		if (isset($xport_meta['Summation'])) {
@@ -178,12 +177,14 @@ if (is_array($xport_array['meta']) && isset($xport_array['meta']['start'])) {
 				} else {
 					$class = 'even';
 				}
-				print "<tr class='$class'><td>" . __('Summation') . "</td><td align='left'>" . $item['value'] . "</td><td align='right'>" . $item['format'] . "</td></tr>\n";
+				print "<tr class='$class'><td>" . __('Summation') . "</td><td class='left'>" . $item['value'] . "</td><td class='right'>" . $item['format'] . "</td></tr>\n";
 			}
 		}
 
 		print "</table><br>\n";
-		print "<table id='csvExport' class='cactiTable' align='center' width='100%'><thead>\n";
+		print "<div class='wrapperTop'><div class='fake'></div></div>\n";
+		print "<div class='wrapperMain' style='display:none;'>\n";
+		print "<table id='csvExport' class='cactiTable'><thead>\n";
 
 		print "<tr class='tableHeader'><th class='tableSubHeaderColumn left ui-resizable'>Date</th>";
 		for ($i = 1; $i <= $xport_array['meta']['columns']; $i++) {
@@ -207,38 +208,66 @@ if (isset($xport_array['data']) && is_array($xport_array['data'])) {
 	} else {
 		$j = 1;
 		foreach($xport_array['data'] as $row) {
-			print "<tr><td align='left'>" . date('Y-m-d H:i:s', (isset($row['timestamp']) ? $row['timestamp'] : $xport_array['meta']['start'] + $j*$xport_array['meta']['step'])) . "</td>";
+			print "<tr><td class='left'>" . date('Y-m-d H:i:s', (isset($row['timestamp']) ? $row['timestamp'] : $xport_array['meta']['start'] + $j*$xport_array['meta']['step'])) . "</td>";
 			for ($i = 1; $i <= $xport_array['meta']['columns']; $i++) {
 				if ($row['col' . $i] > 1) {
-					print "<td align='right'>" . trim(number_format_i18n(round($row['col' . $i],3))) . '</td>';
+					print "<td class='right'>" . trim(number_format_i18n(round($row['col' . $i],3),2,$graph_info['base_value'])) . '</td>';
 				} elseif($row['col' . $i] == 0) {
-					print "<td align='right'>-</td>";
+					print "<td class='right'>-</td>";
 				} else {
-					print "<td align='right'>" . round($row['col' . $i],4) . '</td>';
+					print "<td class='right'>" . round($row['col' . $i],4) . '</td>';
 				}
 			}
 			print "</tr>\n";
 			$j++;
 		}
 
+		print "</table></div>\n";
+
 		?>
 		<script type='text/javascript'>
-		$(function() { 
+		$(function() {
 			$('#csvExport').tablesorter({
-				widgets: ['zebra'], 
-				widgetZebra: { css: ['even', 'odd'] }, 
-				headerTemplate: '<div class="textSubHeaderDark">{content} {icon}</div>', 
-				cssIconAsc: 'fa-sort-asc', 
-				cssIconDesc: 'fa-sort-desc', 
-				cssIconNone: 'fa-sort', 
-				cssIcon: 'fa' 
-			}); 
+				widgets: ['zebra'],
+				widgetZebra: { css: ['even', 'odd'] },
+				headerTemplate: '<div class="textSubHeaderDark">{content} {icon}</div>',
+				cssIconAsc: 'fa-sort-up',
+				cssIconDesc: 'fa-sort-down',
+				cssIconNone: 'fa-sort',
+				cssIcon: 'fa'
+			});
+
+  			$('.wrapperTop').on('scroll', function(){
+				$('.wrapperMain').scrollLeft($('.wrapperTop').scrollLeft());
+			});
+			$('.wrapperMain').on('scroll', function(){
+				$('.wrapperTop').scrollLeft($('.wrapperMain').scrollLeft());
+			});
+
+			$(window).resize(function() {
+				resizeWrapper();
+			});
 		});
+
+		function resizeWrapper() {
+			mainWidth = $(window).width() - $('#navigation').outerWidth() - 40;
+			csvWidth = $('.wrapperMain').outerWidth();
+
+			if (csvWidth > mainWidth) {
+				$('.wrapperMain, .wrapperTop').css('width', mainWidth).css('overflow-x', 'scroll');
+				$('.fake').css('width', csvWidth).css('height', '20px');
+				$('.wrapperTop').css('height', '20px');
+			} else {
+				$('.wrapperTop').hide();
+				$('.wrapperMain').css('width', '100%');
+			}
+			$('.wrapperMain').show();
+		}
 		</script>
 		<?php
 	}
 }
 
 /* log the memory usage */
-cacti_log("The Peak Graph XPORT Memory Usage was '" . memory_get_peak_usage() . "'", FALSE, 'WEBUI', POLLER_VERBOSITY_MEDIUM);
+cacti_log("The Peak Graph XPORT Memory Usage was '" . memory_get_peak_usage() . "'", false, 'WEBUI', POLLER_VERBOSITY_MEDIUM);
 

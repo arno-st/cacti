@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,9 +23,10 @@
 */
 
 function upgrade_to_0_8_7() {
+
 	/* add slope mode as an option */
-	db_install_add_column ('graph_templates_graph', array('name' => 't_slope_mode', 'type' => 'CHAR(2)', 'default' => '0', 'after' => 'vertical_label'));
-	db_install_add_column ('graph_templates_graph', array('name' => 'slope_mode', 'type' => 'CHAR(2)', 'default' => 'on', 'after' => 't_slope_mode'));
+	db_install_add_column('graph_templates_graph', array('name' => 't_slope_mode', 'type' => 'CHAR(2)', 'default' => '0', 'after' => 'vertical_label'));
+	db_install_add_column('graph_templates_graph', array('name' => 'slope_mode', 'type' => 'CHAR(2)', 'default' => 'on', 'after' => 't_slope_mode'));
 
 	/* change the width of the last error field */
 	db_install_execute("ALTER TABLE `host` MODIFY COLUMN `status_last_error` VARCHAR(255);");
@@ -34,124 +35,124 @@ function upgrade_to_0_8_7() {
 	db_install_execute("ALTER TABLE `data_template_rrd` MODIFY COLUMN `rrd_maximum` VARCHAR(20) NOT NULL DEFAULT 0, MODIFY COLUMN `rrd_minimum` VARCHAR(20) NOT NULL DEFAULT 0");
 
 	/* speed up the poller */
-	db_install_execute("ALTER TABLE `host` ADD INDEX `disabled`(`disabled`)");
-	db_install_execute("ALTER TABLE `poller_item` ADD INDEX `rrd_next_step`(`rrd_next_step`)");
+	db_install_add_key('host', 'index', 'disabled', array('disabled'));
+	db_install_add_key('poller_item', 'index', 'rrd_next_step', array('rrd_next_step'));
 
 	/* speed up the UI */
-	db_install_execute("ALTER TABLE `poller_item` ADD INDEX `action`(`action`)");
-	db_install_execute("ALTER TABLE `user_auth` ADD INDEX `username`(`username`)");
-	db_install_execute("ALTER TABLE `user_auth` ADD INDEX `realm`(`realm`)");
-	db_install_execute("ALTER TABLE `user_log` ADD INDEX `username`(`username`)");
-	db_install_execute("ALTER TABLE `data_input` ADD INDEX `name`(`name`)");
+	db_install_add_key('poller_item', 'index', 'action', array('action'));
+	db_install_add_key('user_auth', 'index', 'username', array('username'));
+	db_install_add_key('user_auth', 'index', 'realm', array('realm'));
+	db_install_add_key('user_log', 'index', 'username', array('username'));
+	db_install_add_key('data_input', 'index', 'name', array('name'));
 
 	/* Add enable/disable to users */
-	db_install_add_column ('user_auth', array('name' => 'enabled', 'type' => 'CHAR(2)', 'default' => 'on'));
-	db_install_execute("ALTER TABLE `user_auth` ADD INDEX `enabled`(`enabled`)");
+	db_install_add_column('user_auth', array('name' => 'enabled', 'type' => 'CHAR(2)', 'default' => 'on'));
+	db_install_add_key('user_auth', 'index', 'enabled', array('enabled'));
 
 	/* add additional fields to the host table */
-	db_install_add_column ('host', array('name' => 'availability_method', 'type' => 'SMALLINT(5) UNSIGNED', 'NULL' => false, 'default' => '2', 'after' => 'snmp_timeout'));
-	db_install_add_column ('host', array('name' => 'ping_method', 'type' => 'SMALLINT(5) UNSIGNED', 'default' => '0', 'after' => 'availability_method'));
-	db_install_add_column ('host', array('name' => 'ping_port', 'type' => 'INT(12) UNSIGNED', 'default' => '0', 'after' => 'ping_method'));
-	db_install_add_column ('host', array('name' => 'ping_timeout', 'type' => 'INT(12) UNSIGNED', 'default' => '500', 'after' => 'ping_port'));
-	db_install_add_column ('host', array('name' => 'ping_retries', 'type' => 'INT(12) UNSIGNED', 'default' => '2', 'after' => 'ping_timeout'));
-	db_install_add_column ('host', array('name' => 'max_oids', 'type' => 'INT(12) UNSIGNED', 'default' => '10', 'after' => 'ping_retries'));
-	db_install_add_column ('host', array('name' => 'notes', 'type' => 'TEXT', 'after' => 'hostname'));
-	db_install_add_column ('host', array('name' => 'snmp_auth_protocol', 'type' => 'CHAR(5)', 'default' => '', 'after' => 'snmp_password'));
-	db_install_add_column ('host', array('name' => 'snmp_priv_passphrase', 'type' => 'varchar(200)', 'default' => '', 'after' => 'snmp_auth_protocol'));
-	db_install_add_column ('host', array('name' => 'snmp_priv_protocol', 'type' => 'CHAR(6)', 'default' => '', 'after' => 'snmp_priv_passphrase'));
-	db_install_add_column ('host', array('name' => 'snmp_context', 'type' => 'VARCHAR(64)', 'default' => '', 'after' => 'snmp_priv_protocol'));
+	db_install_add_column('host', array('name' => 'availability_method', 'type' => 'SMALLINT(5) UNSIGNED', 'NULL' => false, 'default' => '2', 'after' => 'snmp_timeout'));
+	db_install_add_column('host', array('name' => 'ping_method', 'type' => 'SMALLINT(5) UNSIGNED', 'default' => '0', 'after' => 'availability_method'));
+	db_install_add_column('host', array('name' => 'ping_port', 'type' => 'INT(12) UNSIGNED', 'default' => '0', 'after' => 'ping_method'));
+	db_install_add_column('host', array('name' => 'ping_timeout', 'type' => 'INT(12) UNSIGNED', 'default' => '500', 'after' => 'ping_port'));
+	db_install_add_column('host', array('name' => 'ping_retries', 'type' => 'INT(12) UNSIGNED', 'default' => '2', 'after' => 'ping_timeout'));
+	db_install_add_column('host', array('name' => 'max_oids', 'type' => 'INT(12) UNSIGNED', 'default' => '10', 'after' => 'ping_retries'));
+	db_install_add_column('host', array('name' => 'notes', 'type' => 'TEXT', 'after' => 'hostname'));
+	db_install_add_column('host', array('name' => 'snmp_auth_protocol', 'type' => 'CHAR(5)', 'default' => '', 'after' => 'snmp_password'));
+	db_install_add_column('host', array('name' => 'snmp_priv_passphrase', 'type' => 'varchar(200)', 'default' => '', 'after' => 'snmp_auth_protocol'));
+	db_install_add_column('host', array('name' => 'snmp_priv_protocol', 'type' => 'CHAR(6)', 'default' => '', 'after' => 'snmp_priv_passphrase'));
+	db_install_add_column('host', array('name' => 'snmp_context', 'type' => 'VARCHAR(64)', 'default' => '', 'after' => 'snmp_priv_protocol'));
 
 	/* additional poller items fields required */
-	db_install_add_column ('poller_item', array('name' => 'snmp_auth_protocol', 'type' => 'CHAR(5)', 'default' => '', 'after' => 'snmp_password'));
-	db_install_add_column ('poller_item', array('name' => 'snmp_priv_passphrase', 'type' => 'varchar(200)', 'default' => '', 'after' => 'snmp_auth_protocol'));
-	db_install_add_column ('poller_item', array('name' => 'snmp_priv_protocol', 'type' => 'CHAR(6)', 'default' => '', 'after' => 'snmp_priv_passphrase'));
-	db_install_add_column ('poller_item', array('name' => 'snmp_context', 'type' => 'VARCHAR(64)', 'default' => '', 'after' => 'snmp_priv_protocol'));
+	db_install_add_column('poller_item', array('name' => 'snmp_auth_protocol', 'type' => 'CHAR(5)', 'default' => '', 'after' => 'snmp_password'));
+	db_install_add_column('poller_item', array('name' => 'snmp_priv_passphrase', 'type' => 'varchar(200)', 'default' => '', 'after' => 'snmp_auth_protocol'));
+	db_install_add_column('poller_item', array('name' => 'snmp_priv_protocol', 'type' => 'CHAR(6)', 'default' => '', 'after' => 'snmp_priv_passphrase'));
+	db_install_add_column('poller_item', array('name' => 'snmp_context', 'type' => 'VARCHAR(64)', 'default' => '', 'after' => 'snmp_priv_protocol'));
 
 	/* Convert to new authentication system */
 	$global_auth = "on";
-	$global_auth_db = db_fetch_row("SELECT value FROM settings WHERE name = 'global_auth'");
-	if (sizeof($global_auth_db)) {
+	$global_auth_db_results = db_install_fetch_row("SELECT value FROM settings WHERE name = 'global_auth'");
+	$global_auth_db         = $global_auth_db_results['data'];
+
+	if (cacti_sizeof($global_auth_db)) {
 		$global_auth = $global_auth_db["value"];
 	}
+
 	$ldap_enabled = "";
-	$ldap_enabled_db = db_fetch_row("SELECT value FROM settings WHERE name = 'ldap_enabled'");
-	if (sizeof($ldap_enabled_db)) {
+	$ldap_enabled_db_results = db_install_fetch_row("SELECT value FROM settings WHERE name = 'ldap_enabled'");
+	$ldap_enabled_db         = $ldap_enabled_db_results['data'];
+
+	if (cacti_sizeof($ldap_enabled_db)) {
 		$ldap_enabled = $ldap_enabled_db["value"];
 	}
-	if ($global_auth == "on") {
-		if ($ldap_enabled == "on") {
-			db_install_execute("INSERT INTO settings VALUES ('auth_method','3')");
+
+	$auth_method_results = db_install_fetch_cell('SELECT value FROM settings WHERE name = \'auth_method\'');
+	if ($auth_method_results['data'] !== false) {
+		if ($global_auth == "on") {
+			if ($ldap_enabled == "on") {
+				db_install_execute("REPLACE INTO settings VALUES ('auth_method','3')");
+			} else {
+				db_install_execute("REPLACE INTO settings VALUES ('auth_method','1')");
+			}
 		} else {
-			db_install_execute("INSERT INTO settings VALUES ('auth_method','1')");
+			db_install_execute("REPLACE INTO settings VALUES ('auth_method','0')");
 		}
-	} else {
-		db_install_execute("INSERT INTO settings VALUES ('auth_method','0')");
 	}
+
 	db_install_execute("UPDATE `settings` SET value = '0' WHERE name = 'guest_user' and value = ''");
-	db_install_execute("UPDATE `settings` SET name = 'user_template' WHERE name = 'ldap_template'");
+
+	db_install_swap_setting('ldap_template', 'user_template');
+
 	db_install_execute("UPDATE `settings` SET value = '0' WHERE name = 'user_template' and value = ''");
 	db_install_execute("DELETE FROM `settings` WHERE name = 'global_auth'");
 	db_install_execute("DELETE FROM `settings` WHERE name = 'ldap_enabled'");
 
 	/* host settings for availability */
+	$ping_port           = 0;
 	$ping_method         = read_config_option("ping_method");
 	$ping_retries        = read_config_option("ping_retries");
 	$ping_timeout        = read_config_option("ping_timeout");
 	$availability_method = read_config_option("availability_method");
-	$hosts               = db_fetch_assoc("SELECT id, snmp_community, snmp_version FROM host");
+	$hosts_results       = db_install_fetch_assoc("SELECT id, snmp_community, snmp_version FROM host");
+	$hosts               = $hosts_results['data'];
 
-	if (sizeof($hosts)) {
+	if (cacti_sizeof($hosts)) {
 		foreach($hosts as $host) {
-			if (strlen($host["snmp_community"] != 0)) {
-				if ($host["snmp_version"] == "3") {
-					if ($availability_method == AVAIL_SNMP) {
-						db_install_execute("UPDATE host SET snmp_priv_protocol='[None]', snmp_auth_protocol='MD5', availability_method=" . AVAIL_SNMP . ", ping_method=" . PING_UDP . ",ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					}else if ($availability_method == AVAIL_SNMP_AND_PING) {
-						if ($ping_method == PING_ICMP) {
-							db_install_execute("UPDATE host SET snmp_priv_protocol='[None]', availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						} else {
-							db_install_execute("UPDATE host SET snmp_priv_protocol='[None]', availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						}
-					} else {
-						if ($ping_method == PING_ICMP) {
-							db_install_execute("UPDATE host SET snmp_priv_protocol='[None]', availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						} else {
-							db_install_execute("UPDATE host SET snmp_priv_protocol='[None]', availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						}
-					}
+			if (strlen($host["snmp_community"]) != 0) {
+				if ($ping_method != PING_ICMP) {
+					$ping_port = 33439;
 				} else {
-					if ($availability_method == AVAIL_SNMP) {
-						db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP . ", ping_method=" . PING_UDP . ",ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					}else if ($availability_method == AVAIL_SNMP_AND_PING) {
-						if ($ping_method == PING_ICMP) {
-							db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						} else {
-							db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						}
-					} else {
-						if ($ping_method == PING_ICMP) {
-							db_install_execute("UPDATE host SET availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						} else {
-							db_install_execute("UPDATE host SET availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-						}
-					}
+					$ping_port = 0;
 				}
-			} else {
-				if ($availability_method == AVAIL_SNMP) {
-					db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP . ", ping_method=" . PING_UDP . ", ping_timeout = " . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-				}else if ($availability_method == AVAIL_SNMP_AND_PING) {
-					if ($ping_method == PING_ICMP) {
-						db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					} else {
-						db_install_execute("UPDATE host SET availability_method=" . AVAIL_SNMP_AND_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					}
-				} else {
-					if ($ping_method == PING_ICMP) {
-						db_install_execute("UPDATE host SET availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					} else {
-						db_install_execute("UPDATE host SET availability_method=" . AVAIL_PING . ", ping_method=" . $ping_method . ", ping_port=33439, ping_timeout=" . $ping_timeout . ", ping_retries=" . $ping_retries . " WHERE id=" . $host["id"]);
-					}
+
+				$fields = array(
+					'snmp_priv_protocol',
+					'availability_method',
+					'ping_method',
+					'ping_timeout',
+					'ping_retries',
+				);
+
+				$params = array(
+					'[None]',
+					$availability_method,
+					$ping_method,
+					$ping_timeout,
+					$ping_retries
+				);
+
+				if (!empty($ping_port)) {
+					$fields['ping_port'] = '?';
+					array_push($params, $ping_port);
 				}
+
+				array_push($params, $host['id']);
+
+				$sqlFields = '';
+				foreach ($fields as $field) {
+					$sqlFields .= (empty($sqlFields) ? '' : ', ') . $field . ' => ?';
+				}
+
+				db_install_execute("UPDATE host SET " . $sqlFields . " WHERE id=?", $params);
 			}
 		}
 	}
@@ -165,10 +166,13 @@ function upgrade_to_0_8_7() {
 	db_install_execute("INSERT INTO data_input_fields VALUES (DEFAULT, '3a33d4fc65b8329ab2ac46a36da26b72',2,'SNMP Privacy Protocol (v3)','snmp_priv_protocol','in','',0,'snmp_priv_protocol','','')");
 
 	/* Add 1 min rra */
-	db_install_execute("INSERT INTO rra VALUES (DEFAULT,'283ea2bf1634d92ce081ec82a634f513','Hourly (1 Minute Average)',0.5,1,500,14400)");
-	$rrd_id = db_fetch_insert_id();
-	db_install_execute("INSERT INTO `rra_cf` VALUES ($rrd_id,1), ($rrd_id,3)");
+	if (db_table_exists('rra')) {
+		db_install_execute("INSERT INTO rra VALUES (DEFAULT,'283ea2bf1634d92ce081ec82a634f513','Hourly (1 Minute Average)',0.5,1,500,14400)");
+		$rrd_id = db_fetch_cell("SELECT id FROM rra WHERE hash='283ea2bf1634d92ce081ec82a634f513'");
+		db_install_execute("INSERT INTO `rra_cf` VALUES (?,1), (?,3)", array($rrd_id, $rrd_id));
+	}
 
 	/* rename cactid path to spine path */
-	db_install_execute("UPDATE settings SET name='path_spine' WHERE name='path_cactid'");
+	db_install_swap_setting('path_cactid', 'path_spine');
 }
+

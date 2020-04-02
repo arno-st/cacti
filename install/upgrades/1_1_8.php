@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -24,8 +24,14 @@
 
 function upgrade_to_1_1_8() {
 	// update graph_watermark if set
-	$current_graph_watermark = db_fetch_cell("SELECT `value` FROM `settings` WHERE name = 'graph_watermark'");
-	if ($current_graph_watermark == 'Copyright (C) 2004-2017 The Cacti Group') {
+	$watermark = '';
+	$result    = db_install_fetch_cell("SELECT `value` FROM `settings` WHERE name = 'graph_watermark'");
+
+	if (isset($result['data'])) {
+		$watermark = $result['data'];
+	}
+
+	if ($watermark == 'Copyright (C) 2004-2017 The Cacti Group') {
 		db_install_execute("DELETE FROM `settings` WHERE name = 'graph_watermark'");
 	}
 }

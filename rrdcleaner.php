@@ -1,8 +1,7 @@
 <?php
-
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -14,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -104,7 +103,7 @@ function rrdclean_fill_table() {
 function rrdcleaner_lastupdate() {
 	$status = db_fetch_row("SHOW TABLE STATUS LIKE 'data_source_purge_temp'");
 
-	if (sizeof($status)) {
+	if (cacti_sizeof($status)) {
 		return $status['Update_time'];
 	}
 }
@@ -261,10 +260,9 @@ function list_rrd() {
 			'default' => '1'
 			),
 		'filter' => array(
-			'filter' => FILTER_CALLBACK,
+			'filter' => FILTER_DEFAULT,
 			'pageset' => true,
-			'default' => '',
-			'options' => array('options' => 'sanitize_search_string')
+			'default' => ''
 			),
 		'sort_column' => array(
 			'filter' => FILTER_CALLBACK,
@@ -300,7 +298,10 @@ function list_rrd() {
 	$sql_where = 'WHERE in_cacti=0';
 	/* form the 'where' clause for our main sql query */
 	if (get_request_var('filter') != '') {
-		$sql_where .= " AND (rc.name LIKE '%" . get_request_var('filter') . "%' OR rc.name_cache LIKE '%" . get_request_var('filter') . "%' OR dt.name LIKE '%" . get_request_var('filter') . "%')";
+		$sql_where .= ' AND (
+			rc.name LIKE '          . db_qstr('%' . get_request_var('filter') . '%') . '
+			OR rc.name_cache LIKE ' . db_qstr('%' . get_request_var('filter') . '%') . '
+			OR dt.name LIKE '       . db_qstr('%' . get_request_var('filter') . '%') . ')';
 	}
 
 	$secsback = get_request_var('age');
@@ -335,13 +336,13 @@ function list_rrd() {
 		$sql_order
 		$sql_limit");
 
-	$nav = html_nav_bar($config['url_path'] . 'rrdcleaner.php?filter'. get_request_var('filter'), MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 8, 'RRD Files', 'page', 'main');
+	$nav = html_nav_bar($config['url_path'] . 'rrdcleaner.php?filter'. get_request_var('filter'), MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 8, __('RRD Files'), 'page', 'main');
 
 	form_start('rrdcleaner.php');
 
 	print $nav;
 
-	html_start_box('', $width, '', '3', 'center', '');
+	html_start_box('', '100%', '', '3', 'center', '');
 
 	$display_text = array(
 		'name'               => array( __('RRD File Name'), 'ASC'),
@@ -355,7 +356,7 @@ function list_rrd() {
 
 	html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false);
 
-	if (sizeof($file_list)) {
+	if (cacti_sizeof($file_list)) {
 		foreach($file_list as $file) {
 			$data_template_name = ((empty($file['data_template_name'])) ? '<em>None</em>' : $file['data_template_name']);
 			form_alternate_row('line' . $file['id'], true);
@@ -375,7 +376,7 @@ function list_rrd() {
 
 	html_end_box(false);
 
-	if (sizeof($file_list)) {
+	if (cacti_sizeof($file_list)) {
 		print $nav;
 	}
 
@@ -475,7 +476,7 @@ function filter() {
 						<?php print __('Search');?>
 					</td>
 					<td>
-						<input id='filter' type='text' size='25' value='<?php print html_escape_request_var('filter');?>'>
+						<input type='text' class='ui-state-default ui-corner-all' id='filter' size='25' value='<?php print html_escape_request_var('filter');?>'>
 					</td>
 					<td>
 						<?php print __('Time Since Update');?>
@@ -500,7 +501,7 @@ function filter() {
 						<select id='rows'>
 							<option value='-1'<?php print (get_request_var('rows') == '-1' ? ' selected>':'>') . __('Default');?></option>
 							<?php
-							if (sizeof($item_rows)) {
+							if (cacti_sizeof($item_rows)) {
 								foreach ($item_rows as $key => $value) {
 									print '<option value="' . $key . '"'; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . $value . "</option>\n";
 								}
@@ -510,15 +511,15 @@ function filter() {
 					</td>
 					<td>
 						<span>
-							<input id='go' type='submit' value='<?php print __x('filter: use', 'Go');?>'>
-							<input id='clear' type='button' value='<?php print __x('filter: reset', 'Clear');?>'>
-							<input id='rescan' type='button' value='<?php print __esc('Rescan');?>' name='rescan'>
+							<input type='submit' class='ui-button ui-corner-all ui-widget' id='go' value='<?php print __x('filter: use', 'Go');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='clear' value='<?php print __x('filter: reset', 'Clear');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='rescan' value='<?php print __esc('Rescan');?>' name='rescan'>
 						</span>
 					</td>
 					<td>
 						<span>
-							<input id='remall' type='button' value='<?php print __esc('Delete All');?>' title='<?php print __esc('Delete All Unknown RRDfiles');?>'>
-							<input id='arcall' type='button' value='<?php print __esc('Archive All');?>' title='<?php print __esc('Archive All Unknown RRDfiles');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='remall' value='<?php print __esc('Delete All');?>' title='<?php print __esc('Delete All Unknown RRDfiles');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='arcall' value='<?php print __esc('Archive All');?>' title='<?php print __esc('Archive All Unknown RRDfiles');?>'>
 						</span>
 					</td>
 					<td id='text'></td>
@@ -552,31 +553,49 @@ function filter() {
 				$('#rescan').click(function() {
 					$('#text').text('Rebuilding RRDfile Listing');
 					pulsate('#text');
-					$.get('rrdcleaner.php?header=false&rescan=1&clear=1', function(data) {
-						$('#main').html(data);
-						$('#text').text('Finished').fadeOut(2000);
-						applySkin();
-					});
+					$.get('rrdcleaner.php?header=false&rescan=1&clear=1')
+						.done(function(data) {
+							checkForLogout(data);
+
+							$('#main').html(data);
+							$('#text').text('Finished').fadeOut(2000);
+							applySkin();
+						})
+						.fail(function(data) {
+							getPresentHTTPError(data);
+						});
 				});
 
 				$('#arcall').click(function() {
 					$('#text').text('Scheduling Archiving of All Unknowns');
 					pulsate('#text');
-					$.get('rrdcleaner.php?header=false&action=arcall&raction=3&clear=1', function(data) {
-						$('#main').html(data);
-						$('#text').text('Finished').fadeOut(2000);
-						applySkin();
-					});
+					$.get('rrdcleaner.php?header=false&action=arcall&raction=3&clear=1')
+						.done(function(data) {
+							checkForLogout(data);
+
+							$('#main').html(data);
+							$('#text').text('Finished').fadeOut(2000);
+							applySkin();
+						})
+						.fail(function(data) {
+							getPresentHTTPError(data);
+						});
 				});
 
 				$('#remall').click(function() {
 					$('#text').text('Scheduling Purging of All Unknowns');
 					pulsate('#text');
-					$.get('rrdcleaner.php?header=false&action=remall&raction=1&clear=1', function(data) {
-						$('#main').html(data);
-						$('#text').text('Finished').fadeOut(2000);
-						applySkin();
-					});
+					$.get('rrdcleaner.php?header=false&action=remall&raction=1&clear=1')
+						.done(function(data) {
+							checkForLogout(data);
+
+							$('#main').html(data);
+							$('#text').text('Finished').fadeOut(2000);
+							applySkin();
+						})
+						.fail(function(data) {
+							getPresentHTTPError(data);
+						});
 				});
 			});
 			</script>

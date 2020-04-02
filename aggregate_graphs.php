@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,21 +23,25 @@
 */
 
 include('./include/auth.php');
-include_once('./lib/utility.php');
 include_once('./lib/api_graph.php');
 include_once('./lib/api_tree.php');
 include_once('./lib/api_data_source.php');
 include_once('./lib/api_aggregate.php');
-include_once('./lib/template.php');
+include_once('./lib/data_query.php');
 include_once('./lib/html_tree.php');
 include_once('./lib/html_form_template.php');
+include_once('./lib/poller.php');
+include_once('./lib/reports.php');
 include_once('./lib/rrd.php');
-include_once('./lib/data_query.php');
+include_once('./lib/template.php');
+include_once('./lib/utility.php');
 
 aggregate_prune_graphs();
 
 $graph_actions = array(
 	1 => __('Delete'),
+	5 => __('Convert to Normal Graph'),
+	4 => __('Place Graphs on Report'),
 	2 => __('Migrate Aggregate to use a Template'),
 	3 => __('Create New Aggregate from Aggregates')
 );
@@ -75,9 +79,9 @@ function add_tree_names_to_actions_array() {
 	/* add a list of tree names to the actions dropdown */
 	$trees = db_fetch_assoc('SELECT id,name FROM graph_tree ORDER BY name');
 
-	if (sizeof($trees)) {
+	if (cacti_sizeof($trees)) {
 		foreach ($trees as $tree) {
-			$graph_actions{'tr_' . $tree['id']} = __('Place on a Tree (%s)', $tree['name']);
+			$graph_actions['tr_' . $tree['id']] = __('Place on a Tree (%s)', $tree['name']);
 		}
 	}
 }
@@ -144,6 +148,7 @@ function form_save() {
 		$save['aggregate_template_id'] = $aggregate_template_id;
 		$save['template_propogation']  = '';
 		$save['gprint_prefix']         = get_nfilter_request_var('gprint_prefix');
+		$save['gprint_format']         = isset_request_var('gprint_format') ? 'on':'';
 		$save['total_prefix']          = get_nfilter_request_var('total_prefix');
 
 		$save['total']                 = get_filter_request_var('total');
@@ -163,6 +168,7 @@ function form_save() {
 			$save_me += ($old['aggregate_template_id'] != $save['aggregate_template_id']);
 			$save_me += ($old['template_propogation']  != $save['template_propogation']);
 			$save_me += ($old['gprint_prefix']         != $save['gprint_prefix']);
+			$save_me += ($old['gprint_format']         != $save['gprint_format']);
 			$save_me += ($old['graph_type']            != $save['graph_type']);
 			$save_me += ($old['total']                 != $save['total']);
 			$save_me += ($old['total_type']            != $save['total_type']);
@@ -268,15 +274,41 @@ function form_actions() {
 			} elseif (get_request_var('drp_action') == '3') { // create aggregate from aggregate
 				$aggregate_name = get_request_var('aggregate_name');
 				api_aggregate_create($aggregate_name, $selected_items);
+			} elseif (get_request_var('drp_action') == '4') { // add graphs to report
+                $good = true;
+                for ($i=0;($i<cacti_count($selected_items));$i++) {
+                    if (!reports_add_graphs(get_filter_request_var('report_id'), $selected_items[$i], get_request_var('timespan'), get_request_var('align'))) {
+                        raise_message('reports_add_error');
+                        $good = false;
+                        break;
+                    }
+                }
+
+                if ($good) {
+                    raise_message('reports_graphs_added');
+                }
+			} elseif (get_request_var('drp_action') == '5') { // Convert to a normal graph
+				api_aggregate_convert_to_graph($selected_items);
+
+				header('Location: aggregate_graphs.php?header=false');
+				exit;
 			} elseif (get_request_var('drp_action') == '10') { // associate with aggregate
-				api_aggregate_associate($selected_items);
+				$local_graph_id = get_filter_request_var('local_graph_id');
+				api_aggregate_associate($local_graph_id, $selected_items);
+
+				header('Location: aggregate_graphs.php?header=false&action=edit&tab=items&id=' . $local_graph_id);
+				exit;
 			} elseif (get_request_var('drp_action') == '11') { // dis-associate with aggregate
-				api_aggregate_disassociate($selected_items);
+				$local_graph_id = get_filter_request_var('local_graph_id');
+				api_aggregate_disassociate($local_graph_id, $selected_items);
+
+				header('Location: aggregate_graphs.php?header=false&action=edit&tab=items&id=' . $local_graph_id);
+				exit;
 			} elseif (preg_match('/^tr_([0-9]+)$/', get_request_var('drp_action'), $matches)) { // place on tree
 				get_filter_request_var('tree_id');
 				get_filter_request_var('tree_item_id');
-				for ($i=0;($i<count($selected_items));$i++) {
-					api_tree_item_save(0, get_nfilter_request_var('tree_id'), TREE_ITEM_TYPE_GRAPH, get_nfilter_request_var('tree_item_id'), '', $selected_items[$i], 0, 0, 0, false);
+				for ($i=0;($i<cacti_count($selected_items));$i++) {
+					api_tree_item_save(0, get_nfilter_request_var('tree_id'), TREE_ITEM_TYPE_GRAPH, get_nfilter_request_var('tree_item_id'), '', $selected_items[$i], 0, 0, 0, 0, false);
 				}
 			}
 		}
@@ -295,7 +327,7 @@ function form_actions() {
 			input_validate_input_number($matches[1]);
 			/* ==================================================== */
 
-			$graph_list .= '<li>' . get_graph_title($matches[1]) . '</li>';
+			$graph_list .= '<li>' . html_escape(get_graph_title($matches[1])) . '</li>';
 			$graph_array[$i] = $matches[1];
 
 			$i++;
@@ -311,16 +343,18 @@ function form_actions() {
 
 	html_start_box($graph_actions{get_request_var('drp_action')}, '60%', '', '3', 'center', '');
 
-	if (isset($graph_array) && sizeof($graph_array)) {
+	$save_html = '';
+
+	if (isset($graph_array) && cacti_sizeof($graph_array)) {
 		if (get_request_var('drp_action') == '1') { // delete
 			print "<tr>
 				<td class='textArea'>
 					<p>" . __('Click \'Continue\' to delete the following Aggregate Graph(s).') . "</p>
 					<div class='itemlist'><ul>$graph_list</ul></div>
 				</td>
-			</tr>\n";
+			</tr>";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '2') { // migrate to aggregate
 			/* determine the common graph template if any */
 			foreach ($_POST as $var => $val) {
@@ -337,24 +371,36 @@ function form_actions() {
 				FROM graph_templates_item
 				WHERE local_graph_id IN($lgid)"), 'task_item_id', 'task_item_id');
 
-			$task_items = implode(',', $task_items);
+			if (cacti_sizeof($task_items)) {
+				$task_items = implode(',', $task_items);
 
-			$graph_templates = db_fetch_assoc("SELECT DISTINCT graph_template_id
-				FROM graph_templates_item
-				WHERE task_item_id IN ($task_items) AND graph_template_id>0");
+				$graph_templates = db_fetch_assoc("SELECT DISTINCT graph_template_id
+					FROM graph_templates_item
+					WHERE task_item_id IN ($task_items) AND graph_template_id>0");
+			} else {
+				$graph_templates = array();
+			}
 
-			if (sizeof($graph_templates) > 1) {
+			if (cacti_sizeof($graph_templates) > 1) {
 				print "<tr>
 					<td class='textArea'>
 						<p>" . __('The selected Aggregate Graphs represent elements from more than one Graph Template.') . "</p>
 						<p>" . __('In order to migrate the Aggregate Graphs below to a Template based Aggregate, they must only be using one Graph Template.  Please press \'Return\' and then select only Aggregate Graph that utilize the same Graph Template.') . "</p>
 						<div class='itemlist'><ul>$graph_list</ul></div>
 					</td>
-				</tr>\n";
+				</tr>";
 
-				$save_html = "<input type='button' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+				$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+			} elseif (cacti_sizeof($graph_templates) == 0) {
+				print "<tr>
+					<td class='textArea'>
+						<p>" . __('The selected Aggregate Graphs does not appear to have any matching Aggregate Templates.') . "</p>
+						<p>" . __('In order to migrate the Aggregate Graphs below use an Aggregate Template, one must already exist.  Please press \'Return\' and then first create your Aggergate Template before retrying.') . "</p>
+						<div class='itemlist'><ul>$graph_list</ul></div>
+					</td>
+				</tr>";
 			} else {
-				$graph_template      = $graph_templates[0]['graph_template_id'];
+				$graph_template = $graph_templates[0]['graph_template_id'];
 
 				$aggregate_templates = db_fetch_assoc_prepared('SELECT id, name
 					FROM aggregate_graph_templates
@@ -362,26 +408,26 @@ function form_actions() {
 					ORDER BY name',
 					array($graph_template));
 
-				if (sizeof($aggregate_templates)) {
+				if (cacti_sizeof($aggregate_templates)) {
 					print "<tr>
 						<td class='textArea' colspan='2'>
 							<p>" . __('Click \'Continue\' and the following Aggregate Graph(s) will be migrated to use the Aggregate Template that you choose below.') . "</p>
 							<div class='itemlist'><ul>$graph_list</ul></div>
 						</td>
-					</tr>\n";
+					</tr>";
 
 					print "<tr>
 						<td class='textArea' width='170'>" . __('Aggregate Template:') . "</td>
 						<td>
-							<select name='aggregate_template_id'>\n";
+							<select name='aggregate_template_id'>";
 
 					html_create_list($aggregate_templates, 'name', 'id', $aggregate_templates[0]['id']);
 
 					print "</select>
 						</td>
-					</tr>\n";
+					</tr>";
 
-					$save_html = "<tr><td colspan='2' align='right'><input type='button' value='" . __esc('Cancel'). "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'></td></tr>";
+					$save_html = "<tr><td colspan='2' class='right'><input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel'). "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'></td></tr>";
 				} else {
 					print "<tr>
 						<td class='textArea'>
@@ -390,9 +436,9 @@ function form_actions() {
 							<p>" . __('Please press \'Return\' to continue.') . "</p>
 							<div class='itemlist'><ul>$graph_list</ul></div>
 						</td>
-					</tr>\n";
+					</tr>";
 
-					$save_html = "<input type='button' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+					$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
 				}
 			}
 		} elseif (get_request_var('drp_action') == '3') { // create aggregate from aggregates
@@ -401,30 +447,72 @@ function form_actions() {
 					<p>" . __('Click \'Continue\' to combine the following Aggregate Graph(s) into a single Aggregate Graph.') . "</p>
 					<div class='itemlist'><ul>$graph_list</ul></div>
 				</td>
-			</tr>\n";
+			</tr>";
 
-			print "	<tr><td class='textArea' width='170'>" . __('Aggregate Name:') . "</td></tr>\n";
-			print "	<tr><td class='textArea'><input name='aggregate_name' size='40' value='" . __esc('New Aggregate') . "'></td></tr>\n";
+			print "	<tr><td class='textArea' width='170'>" . __('Aggregate Name:') . "</td></tr>";
+			print "	<tr><td class='textArea'><input type='text' class='ui-state-default ui-corner-all' name='aggregate_name' size='40' value='" . __esc('New Aggregate') . "'></td></tr>";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Delete Graph(s)') . "'>";
+		} elseif (get_request_var('drp_action') == '4') {
+			global $alignment, $graph_timespans;
+
+			$reports = db_fetch_assoc_prepared('SELECT id, name
+				FROM reports
+				WHERE user_id = ?
+				ORDER BY name',
+				array($_SESSION['sess_user_id']));
+
+			if (cacti_sizeof($reports)) {
+				print "<tr>
+					<td class='textArea'>
+						<p>" . __('Click \'Continue\' to add the selected Graphs to the Report below.') . "</p>
+						<div class='itemlist'><ul>$graph_list</ul></div>
+					</td>
+				</tr>
+				<tr><td>" . __('Report Name') . '<br>';
+				form_dropdown('report_id', $reports, 'name', 'id', '', '', '0');
+				print '</td></tr>';
+
+				print '<tr><td>' . __('Timespan') . '<br>';
+				form_dropdown('timespan',$graph_timespans, '', '', '', '', read_user_setting('default_timespan'));
+				print '</td></tr>';
+
+				print '<tr><td>' . __('Align') . '<br>';
+				form_dropdown('align',$alignment, '', '', '', '', REPORTS_ALIGN_CENTER);
+				print "</td></tr>";
+
+				$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Add Graphs to Report') . "'>";
+			} else {
+				print "<tr><td class='even'><span class='textError'>" . __('You currently have no reports defined.') . "</span></td></tr>";
+				$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+			}
+		} elseif (get_request_var('drp_action') == '5') { // conver to a normal graph
+			print "<tr>
+				<td colspan='2' class='textArea'>
+					<p>" . __('Click \'Continue\' to convert the following Aggregate Graph(s) into a normal Graph.') . "</p>
+					<div class='itemlist'><ul>$graph_list</ul></div>
+				</td>
+			</tr>";
+
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Convert to normal Graph(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '10') { // associate with aggregate
 			print "<tr>
 				<td class='textArea'>
 					<p>" . __('Click \'Continue\' to associate the following Graph(s) with the Aggregate Graph.') . "</p>
 					<div class='itemlist'><ul>$graph_list</ul></div>
 				</td>
-			</tr>\n";
+			</tr>";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Associate Graph(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Associate Graph(s)') . "'>";
 		} elseif (get_request_var('drp_action') == '11') { // dis-associate with aggregate
 			print "<tr>
 				<td class='textArea'>
 					<p>" . __('Click \'Continue\' to disassociate the following Graph(s) from the Aggregate.') . "</p>
 					<div class='itemlist'><ul>$graph_list</ul></div>
 				</td>
-			</tr>\n";
+			</tr>";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Dis-Associate Graph(s)') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Dis-Associate Graph(s)') . "'>";
 		} elseif (preg_match("/^tr_([0-9]+)$/", get_request_var('drp_action'), $matches)) { // place on tree
 			print "<tr>
 				<td class='textArea'>
@@ -432,14 +520,15 @@ function form_actions() {
 					<div class='itemlist'><ul>$graph_list</ul></div>
 					<p>" . __('Destination Branch:') . "<br>"; grow_dropdown_tree($matches[1], '0', 'tree_item_id', '0'); print "</p>
 				</td>
-			</tr>\n
-			<input type='hidden' name='tree_id' value='" . $matches[1] . "'>\n";
+			</tr>
+			<input type='hidden' name='tree_id' value='" . html_escape($matches[1]) . "'>";
 
-			$save_html = "<input type='button' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue') . "' title='" . __esc('Place Graph(s) on Tree') . "'>";
+			$save_html = "<input type='button' class='ui-button ui-corner-all ui-widget' value='" . __esc('Cancel') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' class='ui-button ui-corner-all ui-widget' value='" . __esc('Continue') . "' title='" . __esc('Place Graph(s) on Tree') . "'>";
 		}
 	} else {
-		print "<tr><td class='even'><span class='textError'>" . __('You must select at least one graph.') . "</span></td></tr>\n";
-		$save_html = "<input type='button' value='" . __esc('Return') . "' onClick='cactiReturnTo()'>";
+		raise_message(40);
+		header('Location: aggregate_graphs.php?header=false');
+		exit;
 	}
 
 	print "	<tr>
@@ -450,7 +539,7 @@ function form_actions() {
 			<input type='hidden' name='drp_action' value='" . get_request_var('drp_action') . "'>
 			$save_html
 		</td>
-	</tr>\n";
+	</tr>";
 
 	html_end_box(false);
 
@@ -489,7 +578,7 @@ function item() {
 			ORDER BY gti.sequence',
 			array(get_request_var('id')));
 
-		$header_label = __('Graph Items [edit: %s]', htmlspecialchars(get_graph_title(get_request_var('id'))));
+		$header_label = __esc('Graph Items [edit: %s]', get_graph_title(get_request_var('id')));
 	}
 
 	$graph_template_id = db_fetch_cell_prepared('SELECT graph_template_id
@@ -524,11 +613,12 @@ function graph_edit() {
 	if (isset_request_var('reset')) {
 		$_SESSION['aggregate_referer'] = 'aggregate_graphs.php';
 	} elseif (isset($_SERVER['HTTP_REFERER']) && !substr_count($_SERVER['HTTP_REFERER'], 'aggregate_graphs.php')) {
-		$_SESSION['aggregate_referer'] = $_SERVER['HTTP_REFERER'];
+		$_SESSION['aggregate_referer'] = sanitize_uri($_SERVER['HTTP_REFERER']);
 	} elseif (isset($_SERVER['HTTP_REFERER']) && !isset($_SESSION['aggregate_referer'])) {
-		$_SESSION['aggregate_referer'] = $_SERVER['HTTP_REFERER'];
+		$_SESSION['aggregate_referer'] = sanitize_uri($_SERVER['HTTP_REFERER']);
 	}
-	$referer = $_SESSION['aggregate_referer'];
+
+	$referer = isset($_SESSION['aggregate_referer']) ? $_SESSION['aggregate_referer'] : 'aggregate_graphs.php';
 
 	$use_graph_template = false;
 	$aginfo = array();
@@ -548,10 +638,10 @@ function graph_edit() {
 			$aginfo['title_format'] = get_graph_title($graphs['local_graph_id']);
 		}
 
-		$header_label = '[edit: ' . htmlspecialchars(get_graph_title(get_request_var('id'))) . ']';
+		$header_label = __esc('[edit: %s]', get_graph_title(get_request_var('id')));
 	}
 
-	if (sizeof($aginfo)) {
+	if (cacti_sizeof($aginfo)) {
 		if ($aginfo['aggregate_template_id'] > 0) {
 			$template = db_fetch_row_prepared('SELECT *
 				FROM aggregate_graph_templates
@@ -602,21 +692,21 @@ function graph_edit() {
 	$current_tab = get_nfilter_request_var('tab');
 
 	/* draw the categories tabs on the top of the page */
-	print "<div class='tabs'>\n";
-	print "<div class='aggtabs'><nav><ul role='tablist'>\n";
+	print "<div class='tabs'>";
+	print "<div class='aggtabs'><nav><ul role='tablist'>";
 
 	$i = 0;
-	if (sizeof($aggregate_tabs)) {
+	if (cacti_sizeof($aggregate_tabs)) {
 		foreach (array_keys($aggregate_tabs) as $tab_short_name) {
 			if ($tab_short_name == 'details' || (!isempty_request_var('id'))) {
-				print "<li class='subTab'><a class='tab " . ($tab_short_name == $current_tab ? "selected'" : "'") .
-					" href='" . htmlspecialchars($config['url_path'] . 'aggregate_graphs.php?action=edit&id=' . get_request_var('id') . "&tab=$tab_short_name") . "'>" . $aggregate_tabs[$tab_short_name] . "</a></li>\n";
+				print "<li class='subTab'><a id='agg_" . $tab_short_name . "' class='tab " . ($tab_short_name == $current_tab ? "selected'" : "'") . ($tab_short_name == 'preview' ? ' style="display:none"':'') .
+					" href='" . html_escape($config['url_path'] . 'aggregate_graphs.php?action=edit&id=' . get_request_var('id') . "&tab=$tab_short_name") . "'>" . $aggregate_tabs[$tab_short_name] . "</a></li>";
 			}
 
 			$i++;
 		}
 	}
-	print "</ul>\n";
+	print "</ul>";
 
 	/* handle debug mode */
 	if (isset_request_var('debug')) {
@@ -634,32 +724,43 @@ function graph_edit() {
 	}
 
 	if (!isempty_request_var('id') && $current_tab == 'preview') {
-		print "<ul style='float:right;'><li><a class='pic' href='" . htmlspecialchars('aggregate_graphs.php?action=edit&id=' . get_request_var('id') . '&tab=' . get_request_var('tab') .  '&debug=' . (isset($_SESSION['graph_debug_mode']) ? '0' : '1')) . "'>" . $message . "</a></li></ul></nav>\n</div></div>\n";
-	} elseif (!isempty_request_var('id') && $current_tab == 'details' && (!sizeof($template))) {
-		print "<ul style='float:right;'><li><a id='toggle_items' class='pic' href='#'>" . __('Show Item Details') . "</a></li></ul></nav>\n</div></div>\n";
+		print "<ul style='float:right;'><li><a class='pic' href='" . html_escape('aggregate_graphs.php?action=edit&id=' . get_request_var('id') . '&tab=' . get_request_var('tab') .  '&debug=' . (isset($_SESSION['graph_debug_mode']) ? '0' : '1')) . "'>" . $message . "</a></li></ul></nav></div></div>";
+	} elseif (!isempty_request_var('id') && $current_tab == 'details' && (!cacti_sizeof($template))) {
+		print "<ul style='float:right;'><li><a id='toggle_items' class='pic' href='#'>" . __('Show Item Details') . "</a></li></ul></nav></div></div>";
 	} else {
-		print "</nav></div></div>\n";
+		print "</nav></div></div>";
 	}
 
 	if (!isempty_request_var('id') && $current_tab == 'preview') {
-		html_start_box(__('Aggregate Preview [%s]', $header_label), '100%', '', '3', 'center', '');
+		html_start_box(__('Aggregate Preview %s', $header_label), '100%', '', '3', 'center', '');
 		?>
-		<tr class='even'><td class='center'>
-			<img src='<?php print htmlspecialchars($config['url_path'] . 'graph_image.php?action=edit&disable_cache=1&local_graph_id=' . get_request_var('id') . '&rra_id=' . read_user_setting('default_rra_id') . '&random=' . mt_rand());?>' alt=''>
+		<tr><td id='imagewindow' class='center'>
+			<img src='<?php print html_escape($config['url_path'] . 'graph_image.php?action=edit&disable_cache=1&local_graph_id=' . get_request_var('id') . '&rra_id=' . read_user_setting('default_rra_id') . '&random=' . mt_rand());?>' alt=''>
+			<script type='text/javascript'>
+			$(function() {
+				$('#agg_preview').show();
+			});
+			</script>
 		</td></tr>
 		<?php
 		if (isset($_SESSION['graph_debug_mode']) && isset_request_var('id')) {
 			$graph_data_array['output_flag'] = RRDTOOL_OUTPUT_STDERR;
 			$graph_data_array['print_source'] = 1;
+			$null_param = array();
 			?>
-			<tr><td class='left'>
+			<tr><td id='rrdtoolinfo' class='left' style='padding-left:15px;max-width:900px;overflow:scroll'>
 				<div style='overflow:auto;'>
-				<span class='textInfo'><?php print __('RRDTool Command:');?></span><br>
-				<pre class='monoSpace'><?php print @rrdtool_function_graph(get_request_var('id'), 1, $graph_data_array);?></pre>
-				<span class='textInfo'><?php print __('RRDTool Says:');?></span><br>
-				<?php unset($graph_data_array['print_source']);?>
-				<pre class='monoSpace'><?php print @rrdtool_function_graph(get_request_var('id'), 1, $graph_data_array);?></pre>
+					<span class='textInfo'><?php print __('RRDtool Command:');?></span><br>
+					<?php print @rrdtool_function_graph(get_request_var('id'), 1, $graph_data_array, '', $null_param, $_SESSION['sess_user_id']);?>
+					<span class='textInfo'><?php print __('RRDtool Says:');?></span><br><?php unset($graph_data_array['print_source']);?><pre class='monoSpace tableRow left'><?php print ($config['poller_id'] == 1 ? @rrdtool_function_graph(get_request_var('id'), 1, $graph_data_array, '', $null_param, $_SESSION['sess_user_id']):__esc('Not Checked'));?></pre>
 				</div>
+				<script type='text/javascript'>
+				$(function() {
+					var width = $(window).width() - $('.cactiConsoleNavigationArea').width();
+					$('#agg_preview').show();
+					$('#rrdtoolinfo, #imagewindow').css('max-width', width);
+				});
+				</script>
 			</td></tr>
 			<?php
 		}
@@ -678,7 +779,7 @@ function graph_edit() {
 
 	/* we will show the templated representation only when when there is a template and propagation is enabled */
 	if (!isempty_request_var('id') && $current_tab == 'details') {
-		if (sizeof($template)) {
+		if (cacti_sizeof($template)) {
 			print "<div id='templated'>";
 
 			html_start_box(__('Aggregate Graph %s', $header_label), '100%', true, '3', 'center', '');
@@ -704,6 +805,7 @@ function graph_edit() {
 
 			var templated_selectors = [
 				'#gprint_prefix',
+				'#gprint_format',
 				'#graph_type',
 				'#total',
 				'#total_type',
@@ -745,9 +847,16 @@ function graph_edit() {
 			];
 
 			$(function() {
+				if ($('input[id^="agg_total"]').is(':checked') || $('#template_propogation').is(':checked')) {
+					$('#agg_preview').show();
+				}
+
 				if ($('#template_propogation').is(':checked')) {
 					for (var i = 0; i < templated_selectors.length; i++) {
-						$(templated_selectors[i] ).prop('disabled', true);
+						$(templated_selectors[i]).prop('disabled', true).addClass('ui-state-disabled');
+						if ($(templated_selectors[i]).selectmenu('instance')) {
+							$(templated_selectors[i]).selectmenu('disable');
+						}
 					}
 				} else {
 					$('#row_template_propogation').hide();
@@ -770,6 +879,8 @@ function graph_edit() {
 					}
 
 					changeTotals();
+
+					updateSaveButton();
 				});
 
 				$('#total').change(function() {
@@ -791,7 +902,25 @@ function graph_edit() {
 						}
 					}
 				});
+
+				updateSaveButton();
 			});
+
+			function updateSaveButton() {
+				if ($('input[id^="agg_total"]').is(':checked')) {
+					$('#submit').prop('disabled', false);
+
+					if ($('#submit').button('instance')) {
+						$('#submit').button('enable');
+					}
+				} else {
+					$('#submit').prop('disabled', true);
+
+					if ($('#submit').button('instance')) {
+						$('#submit').button('disable');
+					}
+				}
+			}
 
 			function changeTotals() {
 				switch ($('#total').val()) {
@@ -840,7 +969,7 @@ function graph_edit() {
 		<?php
 
 		/* graph item list goes here */
-		if (empty($graphs['graph_template_id']) && sizeof($template) == 0) {
+		if (empty($graphs['graph_template_id']) && cacti_sizeof($template) == 0) {
 			item();
 		}
 
@@ -857,7 +986,7 @@ function graph_edit() {
 						$form_array[$field_name]['value']   = (isset($graphs) ? $graphs[$field_name] : '');
 						$form_array[$field_name]['form_id'] = (isset($graphs) ? $graphs['id'] : '0');
 
-						if (!(($use_graph_template == false) || ($graphs_template{'t_' . $field_name} == 'on'))) {
+						if (!(($use_graph_template == false) || ($graphs['t_' . $field_name] == 'on'))) {
 							$form_array[$field_name]['method']      = 'template_' . $form_array[$field_name]['method'];
 							$form_array[$field_name]['description'] = '';
 						}
@@ -879,7 +1008,7 @@ function graph_edit() {
 
 		form_hidden_box('save_component_graph','1','');
 		form_hidden_box('save_component_input','1','');
-		form_hidden_box('rrdtool_version', read_config_option('rrdtool_version'), '');
+		form_hidden_box('rrdtool_version', get_rrdtool_version(), '');
 		form_save_button($referer, 'return', 'id');
 
 		echo '</div>';
@@ -887,7 +1016,7 @@ function graph_edit() {
 		?>
 		<script type='text/javascript'>
 
-		$().ready(function() {
+		$(function() {
 			dynamic();
 			if (!$('#templated')) {
 				$('#local_graph_template_graph_id').next('table').css('display', 'none');
@@ -907,7 +1036,7 @@ function graph_edit() {
 		function dynamic() {
 			if ($('#scale_log_units')) {
 				$('#scale_log_units').prop('disabled', true);
-				if (($('#rrdtool_version').val() != 'rrd-1.0.x') &&
+				if (($('#rrdtool_version').val() != '1.0.0') &&
 					($('#auto_scale_log').is(':checked'))) {
 					$('#scale_log_units').prop('disabled', true);
 				}
@@ -917,7 +1046,7 @@ function graph_edit() {
 		function changeScaleLog() {
 			if ($('#scale_log_units')) {
 				$('#scale_log_units').prop('disabled', true);
-				if (($('#rrdtool_version').val() != 'rrd-1.0.x') &&
+				if (($('#rrdtool_version').val() != '1.0.0') &&
 					($('#auto_scale_log').is(':checked'))) {
 					$('#scale_log_units').prop('disabled', false);
 				}
@@ -943,11 +1072,10 @@ function aggregate_items() {
 			'pageset' => true,
 			'default' => '-1'
 			),
-		'filter' => array(
-			'filter' => FILTER_CALLBACK,
+		'rfilter' => array(
+			'filter'  => FILTER_VALIDATE_IS_REGEX,
 			'pageset' => true,
-			'default' => '',
-			'options' => array('options' => 'sanitize_search_string')
+			'default' => ''
 			),
 		'page' => array(
 			'filter' => FILTER_VALIDATE_INT,
@@ -968,6 +1096,17 @@ function aggregate_items() {
 			'default' => 'ASC',
 			'options' => array('options' => 'sanitize_search_string')
 			),
+		'custom' => array(
+			'filter' => FILTER_VALIDATE_REGEXP,
+			'options' => array('options' => array('regexp' => '(true|false)')),
+			'pageset' => true,
+			'default' => ''
+			),
+		'local_graph_ids' => array(
+			'filter' => FILTER_VALIDATE_IS_NUMERIC_LIST,
+			'pageset' => true,
+			'default' => ''
+			)
 	);
 
 	validate_store_request_vars($filters, 'sess_agraph_item');
@@ -979,15 +1118,84 @@ function aggregate_items() {
 		$rows = get_request_var('rows');
 	}
 
+	/* form the 'where' clause for our main sql query */
+	if (get_request_var('rfilter') == '') {
+		$sql_where = '';
+	} elseif (validate_is_regex(get_request_var('rfilter'))) {
+		$sql_where = 'WHERE gtg.title_cache RLIKE "' . get_request_var('rfilter') . '"';
+	} else {
+		$filters = explode(' ', get_request_var('rfilter'));
+		$sql_where = '';
+		$sql_where = aggregate_make_sql_where($sql_where, $filters, 'gtg.title_cache');
+	}
+
+	if (get_request_var('matching') != 'false') {
+		$sql_where .= ($sql_where != '' ? ' AND':'WHERE') . ' (agi.local_graph_id IS NOT NULL)';
+	}
+
+	$graph_template = db_fetch_cell_prepared('SELECT graph_template_id
+		FROM aggregate_graphs AS ag
+		WHERE ag.local_graph_id = ?',
+		array(get_request_var('id')));
+
+	$aggregate_id = db_fetch_cell_prepared('SELECT id
+		FROM aggregate_graphs
+		WHERE local_graph_id = ?',
+		array(get_request_var('id')));
+
+	$total_items = db_fetch_cell_prepared('SELECT COUNT(*)
+		FROM aggregate_graphs_items
+		WHERE aggregate_graph_id = ?',
+		array($aggregate_id));
+
+	if (!empty($graph_template)) {
+		$sql_where .= ($sql_where != '' ? ' AND':'WHERE') . " (gtg.graph_template_id=$graph_template)";
+	}
+
+	if (get_request_var('local_graph_ids') != '') {
+		$sql_where .= ($sql_where != '' ? ' AND ':'WHERE ') . ' agi.local_graph_id IN(' . get_request_var('local_graph_ids') . ')';
+	}
+
+	$total_rows = db_fetch_cell("SELECT COUNT(DISTINCT gl.id) AS total
+		FROM graph_templates_graph AS gtg
+		INNER JOIN graph_local AS gl
+		ON gtg.local_graph_id=gl.id
+		LEFT JOIN (
+			SELECT DISTINCT local_graph_id
+			FROM aggregate_graphs_items
+			WHERE aggregate_graph_id=$aggregate_id) AS agi
+		ON gtg.local_graph_id=agi.local_graph_id
+		$sql_where");
+
+	$sql_order = get_order_string();
+	$sql_limit = ' LIMIT ' . ($rows*(get_request_var('page')-1)) . ',' . $rows;
+
+	$graph_list = db_fetch_assoc("SELECT
+		gtg.id, gtg.local_graph_id, gtg.height, gtg.width, gtg.title_cache, agi.local_graph_id AS agg_graph_id
+		FROM graph_templates_graph AS gtg
+		INNER JOIN graph_local AS gl
+		ON gtg.local_graph_id=gl.id
+		LEFT JOIN (
+			SELECT DISTINCT local_graph_id
+			FROM aggregate_graphs_items
+			WHERE aggregate_graph_id=$aggregate_id) AS agi
+		ON gtg.local_graph_id=agi.local_graph_id
+		$sql_where
+		$sql_order
+		$sql_limit");
+
+
 	?>
 	<script type='text/javascript'>
+	var totalItems=<?php print $total_items;?>;
 
 	function applyFilter() {
-		strURL = 'aggregate_graphs.php?action=edit&tab=items&id='+$('#id').val();
-		strURL += '&rows=' + $('#rows').val();
-		strURL += '&filter=' + $('#filter').val();
-		strURL += '&matching=' + $('#matching').is(':checked');
-		strURL += '&header=false';
+		strURL = 'aggregate_graphs.php' +
+			'?action=edit&tab=items&id='+$('#id').val() +
+			'&rows=' + $('#rows').val() +
+			'&rfilter=' + base64_encode($('#rfilter').val()) +
+			'&matching=' + $('#matching').is(':checked') +
+			'&header=false';
 		loadPageNoHeader(strURL);
 	}
 
@@ -997,6 +1205,10 @@ function aggregate_items() {
 	}
 
 	$(function() {
+		if (totalItems > 0) {
+			$('#agg_preview').show();
+		}
+
 		$('#refresh').click(function() {
 			applyFilter();
 		});
@@ -1005,7 +1217,7 @@ function aggregate_items() {
 			clearFilter();
 		});
 
-		$('#filter').change(function() {
+		$('#rfilter').change(function() {
 			applyFilter();
 		});
 
@@ -1029,7 +1241,7 @@ function aggregate_items() {
 						<?php print __('Search');?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' onChange='applyFilter()' value='<?php print get_request_var('filter');?>'>
+						<input type='text' class='ui-state-default ui-corner-all' id='rfilter' size='45' onChange='applyFilter()' value='<?php print get_request_var('rfilter');?>'>
 					</td>
 					<td>
 						<?php print __('Graphs');?>
@@ -1038,9 +1250,9 @@ function aggregate_items() {
 						<select id='rows' onChange='applyFilter()'>
 							<option value='-1'<?php print (get_request_var('rows') == '-1' ? ' selected>':'>') . __('Default');?></option>
 							<?php
-							if (sizeof($item_rows) > 0) {
+							if (cacti_sizeof($item_rows) > 0) {
 								foreach ($item_rows as $key => $value) {
-									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . htmlspecialchars($value) . "</option>\n";
+									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . html_escape($value) . "</option>";
 								}
 							}
 							?>
@@ -1054,8 +1266,8 @@ function aggregate_items() {
 					</td>
 					<td>
 						<span>
-							<input id='refresh' type='button' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
-							<input id='clear' type='button' onClick='clearFilter()' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='refresh' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='clear' onClick='clearFilter()' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
 						</span>
 					</td>
 				</tr>
@@ -1070,64 +1282,10 @@ function aggregate_items() {
 
 	html_end_box(false);
 
-	/* form the 'where' clause for our main sql query */
-	if (get_request_var('filter') != '') {
-		$filters = explode(' ', get_request_var('filter'));
-		$sql_where = '';
-		$sql_where = aggregate_make_sql_where($sql_where, $filters, 'gtg.title_cache');
-
-		//$sql_where = "WHERE (gtg.title_cache LIKE '%%" . get_request_var("filter") . "%%')";
-	} else {
-		$sql_where = '';
-	}
-
-	if (get_request_var('matching') != 'false') {
-		$sql_where .= ($sql_where != '' ? ' AND':'WHERE') . ' (agi.local_graph_id IS NOT NULL)';
-	}
-
-	$graph_template = db_fetch_cell_prepared('SELECT graph_template_id
-		FROM aggregate_graphs AS ag
-		WHERE ag.local_graph_id = ?',
-		array(get_request_var('id')));
-
-	$aggregate_id = db_fetch_cell_prepared('SELECT id
-		FROM aggregate_graphs
-		WHERE local_graph_id = ?',
-		array(get_request_var('id')));
-
-	if (!empty($graph_template)) {
-		$sql_where .= ($sql_where != '' ? ' AND':'WHERE') . "(gtg.graph_template_id=$graph_template)";
-	}
-
 	/* print checkbox form for validation */
 	form_start('aggregate_graphs.php', 'chk');
 
 	html_start_box('', '100%', '', '3', 'center', '');
-
-	$total_rows = db_fetch_cell("SELECT COUNT(DISTINCT gl.id) AS total
-		FROM graph_templates_graph AS gtg
-		INNER JOIN graph_local AS gl
-		ON gtg.local_graph_id=gl.id
-		LEFT JOIN (SELECT DISTINCT local_graph_id FROM aggregate_graphs_items) AS agi
-		ON gtg.local_graph_id=agi.local_graph_id
-		$sql_where");
-
-	$sql_order = get_order_string();
-	$sql_limit = ' LIMIT ' . ($rows*(get_request_var('page')-1)) . ',' . $rows;
-
-	$graph_list = db_fetch_assoc("SELECT
-		gtg.id, gtg.local_graph_id, gtg.height, gtg.width, gtg.title_cache, agi.local_graph_id AS agg_graph_id
-		FROM graph_templates_graph AS gtg
-		INNER JOIN graph_local AS gl
-		ON gtg.local_graph_id=gl.id
-		LEFT JOIN (
-			SELECT DISTINCT local_graph_id
-			FROM aggregate_graphs_items
-			WHERE aggregate_graph_id=$aggregate_id) AS agi
-		ON gtg.local_graph_id=agi.local_graph_id
-		$sql_where
-		$sql_order
-		$sql_limit");
 
 	$nav = html_nav_bar('aggregate_graphs.php?action=edit&tab=items&id=' . get_request_var('id'), MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 5, __('Graphs'), 'page', 'main');
 
@@ -1141,14 +1299,20 @@ function aggregate_items() {
 
 	html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false, 'aggregate_graphs.php?action=edit&id=' . get_request_var('id'));
 
-	if (sizeof($graph_list) > 0) {
+	if (cacti_sizeof($graph_list) > 0) {
 		foreach ($graph_list as $graph) {
 			/* we're escaping strings here, so no need to escape them on form_selectable_cell */
 			form_alternate_row('line' . $graph['local_graph_id'], true);
-			form_selectable_cell(get_request_var('filter') != '' ? aggregate_format_text(htmlspecialchars($graph['title_cache']), get_request_var('filter')) : htmlspecialchars($graph['title_cache']), $graph['local_graph_id']);
+
+			if (validate_is_regex(get_request_var('rfilter'))) {
+				form_selectable_cell(filter_value($graph['title_cache'], get_request_var('rfilter')), $graph['local_graph_id']);
+			} else {
+				form_selectable_ecell(get_request_var('rfilter') != '' ? aggregate_format_text($graph['title_cache'], get_request_var('rfilter')) : $graph['title_cache'], $graph['local_graph_id']);
+			}
+
 			form_selectable_cell($graph['local_graph_id'], $graph['local_graph_id'], '', 'right');
 			form_selectable_cell(($graph['agg_graph_id'] != '' ? "<span class='associated'>" . __('Yes') . '</span>':"<span class='notAssociated'>" . __('No') . "</span>"), $graph['local_graph_id']);
-			form_selectable_cell($graph['height'] . 'x' . $graph['width'], $graph['local_graph_id'], '', 'right');
+			form_selectable_ecell($graph['height'] . 'x' . $graph['width'], $graph['local_graph_id'], '', 'right');
 			form_checkbox_cell($graph['title_cache'], $graph['local_graph_id']);
 			form_end_row();
 		}
@@ -1180,43 +1344,48 @@ function aggregate_make_sql_where($sql_where, $items, $field) {
 	}
 
 	$indentation = 0;
+	$termcount   = 0;
 
-	if (sizeof($items)) {
-	foreach($items as $i) {
-		$i = trim($i);
-		while (substr($i,0,1) == '(') {
-			$indentation++;
-			$sql_where .= '(';
-			$i = substr($i,1);
-		}
+	if (cacti_sizeof($items)) {
+		foreach($items as $i) {
+			$i = trim($i);
+			while (substr($i,0,1) == '(') {
+				$indentation++;
+				$termcount = 0;
+				$sql_where .= '(';
+				$i = substr($i, 1);
+			}
 
-		$split = strpos($i, ')');
-		if ($split !== false) {
-			$end = trim(substr($i,$split));
-			$i   = substr($i,0,$split);
-		} else {
-			$end = '';
-		}
-
-		if ($i != '') {
-			if (strtolower($i) == 'and') {
-				$sql_where .= ' AND ';
-			} elseif (strtolower($i) == 'or') {
-				$sql_where .= ' OR ';
+			$split = strpos($i, ')');
+			if ($split !== false) {
+				$end = trim(substr($i, $split));
+				$i   = substr($i, 0, $split);
 			} else {
-				$sql_where .= $field . " LIKE '%%" . trim($i) . "%%'";
+				$end = '';
 			}
-		}
 
-		if ($end != '') {
-			while (substr($end,0,1) == ')') {
-				$indentation--;
-				$sql_where .= ')';
-				$end = trim(substr($end,1));
+			if ($i != '') {
+				if (strtolower($i) == 'and') {
+					$sql_where .= ' AND ';
+				} elseif (strtolower($i) == 'or') {
+					$sql_where .= ' OR ';
+				} else {
+					$sql_where .= ($termcount > 0 ? ' OR ':'') . $field . " LIKE '%" . trim($i) . "%'";
+					$termcount++;
+				}
+			}
+
+			if ($end != '') {
+				while (substr($end, 0, 1) == ')') {
+					$indentation--;
+					$termcount = 0;
+					$sql_where .= ')';
+					$end = trim(substr($end, 1));
+				}
 			}
 		}
 	}
-	}
+
 	$sql_where .= ')';
 
 	return trim($sql_where);
@@ -1240,9 +1409,9 @@ function aggregate_format_text($text, $filter) {
 		}
 	}
 
-	if (sizeof($tags)) {
+	if (cacti_sizeof($tags)) {
 		foreach($tags as $k => $t) {
-			$text = str_replace("<<$k>>", "<span class='filteredValue'>" . htmlspecialchars($t) . "</span>", $text);
+			$text = str_replace("<<$k>>", "<span class='filteredValue'>" . html_escape($t) . "</span>", $text);
 		}
 	}
 
@@ -1265,10 +1434,9 @@ function aggregate_graph() {
 			'default' => '-1'
 			),
 		'filter' => array(
-			'filter' => FILTER_CALLBACK,
+			'filter' => FILTER_DEFAULT,
 			'pageset' => true,
 			'default' => '',
-			'options' => array('options' => 'sanitize_search_string')
 			),
 		'page' => array(
 			'filter' => FILTER_VALIDATE_INT,
@@ -1284,6 +1452,11 @@ function aggregate_graph() {
 			'default' => 'ASC',
 			'options' => array('options' => 'sanitize_search_string')
 			),
+		'local_graph_ids' => array(
+			'filter' => FILTER_VALIDATE_IS_NUMERIC_LIST,
+			'pageset' => true,
+			'default' => ''
+			)
 	);
 
 	validate_store_request_vars($filters, 'sess_agraph');
@@ -1313,6 +1486,10 @@ function aggregate_graph() {
 	}
 
 	$(function() {
+		if ($('input[id^="agg_total"]').is(':checked') || $('#template_propogation').is(':checked')) {
+			$('#agg_preview').show();
+		}
+
 		$('#refresh').click(function() {
 			applyFilter();
 		});
@@ -1334,7 +1511,7 @@ function aggregate_graph() {
 	</script>
 	<?php
 
-	html_start_box(__('Aggregate Graphs'), '100%', '', '3', 'center', '');
+	html_start_box(__('Aggregate Graphs') . (get_request_var('local_graph_ids') != '' ? __(' [ Custom Graphs List Applied - Clear to Reset ]'): ''), '100%', '', '3', 'center', '');
 
 	?>
 	<tr class='even'>
@@ -1346,7 +1523,7 @@ function aggregate_graph() {
 						<?php print __('Search');?>
 					</td>
 					<td>
-						<input type='text' id='filter' size='25' value='<?php print get_request_var('filter');?>'>
+						<input type='text' class='ui-state-default ui-corner-all' id='filter' size='25' value='<?php print html_escape_request_var('filter');?>'>
 					</td>
 					<td>
 						<?php print __('Template');?>
@@ -1362,9 +1539,9 @@ function aggregate_graph() {
 								ON ag.aggregate_template_id=at.id
 								ORDER BY name');
 
-							if (sizeof($templates) > 0) {
+							if (cacti_sizeof($templates) > 0) {
 								foreach ($templates as $template) {
-									print "<option value='" . $template['id'] . "'"; if (get_request_var('template_id') == $template['id']) { print ' selected'; } print '>' . htmlspecialchars($template['name']) . "</option>\n";
+									print "<option value='" . $template['id'] . "'"; if (get_request_var('template_id') == $template['id']) { print ' selected'; } print '>' . html_escape($template['name']) . "</option>";
 								}
 							}
 							?>
@@ -1377,9 +1554,9 @@ function aggregate_graph() {
 						<select id='rows' onChange='applyFilter()'>
 							<option value='-1'<?php print (get_request_var('rows') == '-1' ? ' selected>':'>') . __('Default');?></option>
 							<?php
-							if (sizeof($item_rows) > 0) {
+							if (cacti_sizeof($item_rows) > 0) {
 								foreach ($item_rows as $key => $value) {
-									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . htmlspecialchars($value) . "</option>\n";
+									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . html_escape($value) . "</option>";
 								}
 							}
 							?>
@@ -1387,8 +1564,8 @@ function aggregate_graph() {
 					</td>
 					<td>
 						<span>
-							<input type='button' id='refresh' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
-							<input type='button' id='clear' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='refresh' value='<?php print __esc('Go');?>' title='<?php print __esc('Set/Refresh Filters');?>'>
+							<input type='button' class='ui-button ui-corner-all ui-widget' id='clear' value='<?php print __esc('Clear');?>' title='<?php print __esc('Clear Filters');?>'>
 						</span>
 					</td>
 				</tr>
@@ -1403,8 +1580,8 @@ function aggregate_graph() {
 	$sql_where = 'WHERE (gtg.graph_template_id=0 AND gl.host_id=0)';
 	/* form the 'where' clause for our main sql query */
 	if (get_request_var('filter') != '') {
-		$sql_where .= " AND (gtg.title_cache LIKE '%%" . get_request_var('filter') . "%%'" .
-			" OR ag.title_format LIKE '%%" . get_request_var('filter') . "%%')";
+		$sql_where .= " AND (gtg.title_cache LIKE " . db_qstr('%' . get_request_var('filter') . '%') .
+			" OR ag.title_format LIKE " . db_qstr('%' . get_request_var('filter') . '%') . ")";
 	}
 
 	if (get_request_var('template_id') == '-1') {
@@ -1459,26 +1636,25 @@ function aggregate_graph() {
 
 	html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false, 'aggregate_graphs.php?filter=' . get_request_var('filter'));
 
-	if (sizeof($graph_list)) {
+	if (cacti_sizeof($graph_list)) {
 		foreach ($graph_list as $graph) {
 			/* we're escaping strings here, so no need to escape them on form_selectable_cell */
-			$template_name = htmlspecialchars($graph['name']);
+			$template_name = html_escape($graph['name']);
 			form_alternate_row('line' . $graph['local_graph_id'], true);
 			form_selectable_cell(filter_value(title_trim($graph['title_cache'], read_config_option('max_title_length')), get_request_var('filter'), 'aggregate_graphs.php?action=edit&id=' . $graph['local_graph_id']), $graph['local_graph_id']);
 			form_selectable_cell($graph['local_graph_id'], $graph['local_graph_id'], '', 'right');
 			form_selectable_cell((empty($graph['name']) ? '<em>' . __('None') . '</em>' : filter_value($template_name, get_request_var('filter'))), $graph['local_graph_id']);
-			form_selectable_cell($graph['height'] . 'x' . $graph['width'], $graph['local_graph_id'], '', 'right');
+			form_selectable_ecell($graph['height'] . 'x' . $graph['width'], $graph['local_graph_id'], '', 'right');
 			form_checkbox_cell($graph['title_cache'], $graph['local_graph_id']);
 			form_end_row();
 		}
 	} else {
-		print '<tr><td><em>' . __('No Aggregate Graphs Found') .'</em></td></tr>';
+		print '<tr class="tableRow"><td colspan="' . (cacti_sizeof($display_text)+1) . '"><em>' . __('No Aggregate Graphs Found') .'</em></td></tr>';
 	}
 
 	html_end_box(false);
 
-	if (sizeof($graph_list)) {
-		/* put the nav bar on the bottom as well */
+	if (cacti_sizeof($graph_list)) {
 		print $nav;
 	}
 
@@ -1501,7 +1677,7 @@ function purge_old_graphs() {
 		LEFT JOIN graph_local AS gl ON pagi.local_graph_id=gl.id
 		WHERE gl.id IS NULL AND local_graph_id>0'), 'local_graph_id',  'local_graph_id');
 
-	if (sizeof($old_graphs)) {
+	if (cacti_sizeof($old_graphs)) {
 		db_execute('DELETE FROM aggregate_graphs_items
 			WHERE local_graph_id IN (' . implode(',', $old_graphs) . ')');
 	}
@@ -1518,7 +1694,7 @@ function purge_old_graphs() {
 		ON pag.local_graph_id=gl.id
 		WHERE gl.id IS NULL'), 'id', 'id');
 
-	if (sizeof($old_aggregates)) {
+	if (cacti_sizeof($old_aggregates)) {
 		db_execute('DELETE FROM graph_templates_item
 			WHERE local_graph_id IN (' . implode(',', $old_aggregates) . ')');
 
@@ -1529,7 +1705,7 @@ function purge_old_graphs() {
 			WHERE local_graph_id IN (' . implode(',', $old_aggregates) . ')');
 	}
 
-	if (sizeof($old_agg_ids)) {
+	if (cacti_sizeof($old_agg_ids)) {
 		db_execute('DELETE FROM aggregate_graphs_items
 			WHERE aggregate_graph_id IN (' . implode(',', $old_agg_ids) . ')');
 	}

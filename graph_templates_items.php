@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -23,7 +23,9 @@
 */
 
 include('./include/auth.php');
+include_once('./lib/api_data_source.php');
 include_once('./lib/template.php');
+include_once('./lib/utility.php');
 
 /* set default action */
 set_default_action();
@@ -173,7 +175,7 @@ function form_save() {
 			$save['graph_type_id']     = form_input_validate((isset($item['graph_type_id']) ? $item['graph_type_id'] : get_filter_request_var('graph_type_id')), 'graph_type_id', '^[0-9]+$', true, 3);
 
 			if (isset_request_var('line_width') || isset($item['line_width'])) {
-				$save['line_width']    = form_input_validate((isset($item['line_width']) ? $item['line_width'] : get_nfilter_request_var('line_width')), 'line_width', '^[0-9]+[.0-9]+$', true, 3);
+				$save['line_width']    = form_input_validate((isset($item['line_width']) ? $item['line_width'] : get_nfilter_request_var('line_width')), 'line_width', '(^[0-9]+[\.,0-9]+$|^[0-9]+$)', true, 3);
 			}else { # make sure to transfer old LINEx style into line_width on save
 				switch ($save['graph_type_id']) {
 				case GRAPH_ITEM_TYPE_LINE1:
@@ -232,11 +234,11 @@ function form_save() {
 								array($graph_template_item_id));
 
 							/* Input for current data source exists and has changed.  Update the association */
-							if (isset($orig_data_source_to_input{$save['task_item_id']})) {
+							if (isset($orig_data_source_to_input[$save['task_item_id']])) {
 								db_execute_prepared('REPLACE INTO graph_template_input_defs
 									(graph_template_input_id, graph_template_item_id)
 									VALUES (?, ?)',
-									array($orig_data_source_to_input{$save['task_item_id']}, $graph_template_item_id));
+									array($orig_data_source_to_input[$save['task_item_id']], $graph_template_item_id));
 							}
 						}
 
@@ -260,7 +262,7 @@ function form_save() {
 								AND task_item_id = ?',
 								array($save['graph_template_id'], get_nfilter_request_var('task_item_id')));
 
-							if (sizeof($graph_items)) {
+							if (cacti_sizeof($graph_items)) {
 								foreach ($graph_items as $graph_item) {
 									db_execute_prepared('REPLACE INTO graph_template_input_defs
 										(graph_template_input_id, graph_template_item_id)
@@ -273,9 +275,9 @@ function form_save() {
 
 					push_out_graph_item($graph_template_item_id);
 
-					if (isset($orig_data_source_to_input{get_nfilter_request_var('task_item_id')})) {
+					if (isset($orig_data_source_to_input[get_nfilter_request_var('task_item_id')])) {
 						/* make sure all current graphs using this graph input are aware of this change */
-						push_out_graph_input($orig_data_source_to_input{get_nfilter_request_var('task_item_id')}, $graph_template_item_id, array($graph_template_item_id => $graph_template_item_id));
+						push_out_graph_input($orig_data_source_to_input[get_nfilter_request_var('task_item_id')], $graph_template_item_id, array($graph_template_item_id => $graph_template_item_id));
 					}
 				} else {
 					raise_message(2);
@@ -307,12 +309,19 @@ function item_movedown() {
 
 	global $graph_item_types;
 
-	$arr     = get_graph_group(get_request_var('id'));
-	$next_id = get_graph_parent(get_request_var('id'), 'next');
+	$arr        = get_graph_group(get_request_var('id'));
+	$next_id    = get_graph_parent(get_request_var('id'), 'next');
 
-	if ((!empty($next_id)) && (isset($arr{get_request_var('id')}))) {
+	$graph_type = db_fetch_cell_prepared('SELECT graph_type_id
+		FROM graph_templates_item
+		WHERE id = ?',
+		array(get_request_var('id')));
+
+	$text_type  = $graph_item_types[$graph_type];
+
+	if (!empty($next_id) && isset($arr[get_request_var('id')])) {
 		move_graph_group(get_request_var('id'), $arr, $next_id, 'next');
-	} elseif (preg_match('/(GPRINT|VRULE|HRULE|COMMENT)/', $graph_item_types{db_fetch_cell_prepared('SELECT graph_type_id FROM graph_templates_item WHERE id = ?', array(get_request_var('id')))})) {
+	} elseif (!preg_match('/(AREA|STACK|LINE)/', $text_type)) {
 		/* this is so we know the "other" graph item to propagate the changes to */
 		$next_item = get_item('graph_templates_item', 'sequence', get_request_var('id'), 'graph_template_id=' . get_request_var('graph_template_id') . ' AND local_graph_id=0', 'next');
 
@@ -335,9 +344,16 @@ function item_moveup() {
 	$arr = get_graph_group(get_request_var('id'));
 	$next_id = get_graph_parent(get_request_var('id'), 'previous');
 
-	if ((!empty($next_id)) && (isset($arr{get_request_var('id')}))) {
+	$graph_type = db_fetch_cell_prepared('SELECT graph_type_id
+		FROM graph_templates_item
+		WHERE id = ?',
+		array(get_request_var('id')));
+
+	$text_type  = $graph_item_types[$graph_type];
+
+	if (!empty($next_id) && isset($arr[get_request_var('id')])) {
 		move_graph_group(get_request_var('id'), $arr, $next_id, 'previous');
-	} elseif (preg_match('/(GPRINT|VRULE|HRULE|COMMENT)/', $graph_item_types{db_fetch_cell_prepared('SELECT graph_type_id FROM graph_templates_item WHERE id = ?', array(get_request_var('id')))})) {
+	} elseif (!preg_match('/(AREA|STACK|LINE)/', $text_type)) {
 		/* this is so we know the "other" graph item to propagate the changes to */
 		$last_item = get_item('graph_templates_item', 'sequence', get_request_var('id'), 'graph_template_id=' . get_request_var('graph_template_id') . ' AND local_graph_id=0', 'previous');
 
@@ -367,9 +383,9 @@ function item_remove() {
 		AND graph_template_input_defs.graph_template_item_id = ?
 		GROUP BY graph_template_input.id', array(get_request_var('graph_template_id'), get_request_var('id')));
 
-	if (sizeof($graph_item_inputs) > 0) {
+	if (cacti_sizeof($graph_item_inputs) > 0) {
 		foreach ($graph_item_inputs as $graph_item_input) {
-			if (sizeof(db_fetch_assoc_prepared('SELECT graph_template_input_id FROM graph_template_input_defs WHERE graph_template_input_id = ?', array($graph_item_input['id']))) == 1) {
+			if (cacti_sizeof(db_fetch_assoc_prepared('SELECT graph_template_input_id FROM graph_template_input_defs WHERE graph_template_input_id = ?', array($graph_item_input['id']))) == 1) {
 				db_execute_prepared('DELETE FROM graph_template_input WHERE id = ?', array($graph_item_input['id']));
 			}
 		}
@@ -388,7 +404,7 @@ function item_edit() {
 
 	form_start('graph_templates_items.php', 'graph_items');
 
-	$header_label = __('Graph Template Items [edit graph: %s]', htmlspecialchars(db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array(get_request_var('graph_template_id')))));
+	$header_label = __esc('Graph Template Items [edit graph: %s]', db_fetch_cell_prepared('SELECT name FROM graph_templates WHERE id = ?', array(get_request_var('graph_template_id'))));
 
 	html_start_box($header_label, '100%', true, '3', 'center', '');
 
@@ -408,7 +424,7 @@ function item_edit() {
 			ORDER BY sequence DESC',
 			array(get_request_var('graph_template_id')));
 
-		if (sizeof($default) > 0) {
+		if (cacti_sizeof($default) > 0) {
 			$struct_graph_item['task_item_id']['default'] = $default['task_item_id'];
 		} else {
 			$struct_graph_item['task_item_id']['default'] = 0;
@@ -436,24 +452,6 @@ function item_edit() {
 
 	}
 
-	if (!isempty_request_var('id')) {
-		/* we want to mark the fields that are associated with a graph item input */
-		$graph_item_input_fields = db_fetch_assoc_prepared('SELECT
-			graph_template_input.id,
-			graph_template_input.column_name
-			FROM (graph_template_input, graph_template_input_defs)
-			WHERE graph_template_input.id = graph_template_input_defs.graph_template_input_id
-			AND graph_template_input.graph_template_id = ?
-			AND graph_template_input_defs.graph_template_item_id = ?
-			GROUP BY graph_template_input.column_name', array(get_request_var('graph_template_id'), get_request_var('id')));
-
-		if (sizeof($graph_item_input_fields) > 0) {
-			foreach ($graph_item_input_fields as $field) {
-				$form_array{$field['column_name']}['friendly_name'] .= " [<a href='" . htmlspecialchars('graph_templates_inputs.php?action=input_edit&id=' . $field['id'] . '&graph_template_id=' . get_request_var('graph_template_id')) . "'>" . __('Field Not Templated') . "</a>]";
-			}
-		}
-	}
-
 	draw_edit_form(
 		array(
 			'config' => array('no_form_tag' => true),
@@ -469,7 +467,7 @@ function item_edit() {
 	form_hidden_box('_task_item_id', (isset($template_item) ? $template_item['task_item_id'] : '0'), '');
 	form_hidden_box('save_component_item', '1', '');
 	form_hidden_box('invisible_alpha', $form_array['alpha']['value'], 'FF');
-	form_hidden_box('rrdtool_version', read_config_option('rrdtool_version'), '');
+	form_hidden_box('rrdtool_version', get_rrdtool_version(), '');
 
 	form_save_button('graph_templates.php?action=template_edit&id=' . get_request_var('graph_template_id'));
 
@@ -515,7 +513,7 @@ function item_edit() {
 	function setRowVisibility() {
 		switch($('#graph_type_id').val()) {
 		case '1': // COMMENT
-			$('#row_task_item_id').hide();
+			$('#row_task_item_id').show();
 			$('#row_color_id').hide();
 			$('#row_line_width').hide();
 			$('#row_dashes').hide();
@@ -532,6 +530,22 @@ function item_edit() {
 			$('#row_hard_return').show();
 			break;
 		case '2': // HRULE
+			$('#row_task_item_id').show();
+			$('#row_color_id').show();
+			$('#row_line_width').hide();
+			$('#row_dashes').show();
+			$('#row_dash_offset').show();
+			$('#row_textalign').hide();
+			$('#row_shift').hide();
+			$('#row_alpha').hide();
+			$('#row_consolidation_function_id').hide();
+			$('#row_cdef_id').hide();
+			$('#row_vdef_id').hide();
+			$('#row_value').show();
+			$('#row_gprint_id').hide();
+			$('#row_text_format').show();
+			$('#row_hard_return').show();
+			break;
 		case '3': // VRULE
 			$('#row_task_item_id').hide();
 			$('#row_color_id').show();

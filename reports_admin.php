@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2004-2017 The Cacti Group                                 |
+ | Copyright (C) 2004-2020 The Cacti Group                                 |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -13,7 +13,7 @@
  | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           |
  | GNU General Public License for more details.                            |
  +-------------------------------------------------------------------------+
- | Cacti: The Complete RRDTool-based Graphing Solution                     |
+ | Cacti: The Complete RRDtool-based Graphing Solution                     |
  +-------------------------------------------------------------------------+
  | This code is designed, written, and maintained by the Cacti Group. See  |
  | about.php and/or the AUTHORS file for specific developer information.   |
@@ -26,6 +26,7 @@ $guest_account = true;
 include('./include/auth.php');
 include_once($config['library_path'] . '/reports.php');
 include_once($config['library_path'] . '/html_reports.php');
+include_once($config['library_path'] . '/timespan_settings.php');
 
 get_filter_request_var('id');
 get_filter_request_var('tab', FILTER_CALLBACK, array('options' => 'sanitize_search_string'));
@@ -47,6 +48,11 @@ switch (get_request_var('action')) {
 		reports_send(get_request_var('id'));
 
 		header('Location: reports_admin.php?action=edit&tab=' . get_request_var('tab') . '&id=' . get_request_var('id'));
+		break;
+	case 'ajax_dnd':
+		reports_item_dnd();
+
+		header('Location: reports_admin.php?action=edit&header=false&tab=items&id=' . get_request_var('id'));
 		break;
 	case 'actions':
 		reports_form_actions();
